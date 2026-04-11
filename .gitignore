@@ -1,0 +1,11 @@
+.env
+.tactus/config.yml
+.pytest_cache/
+__pycache__/
+*.pyc
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/

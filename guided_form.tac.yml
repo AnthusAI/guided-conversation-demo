@@ -1,0 +1,9 @@
+# Merge with ~/.tactus/config.yml — sidecar is trusted (not sandboxed).
+# Default: Docker containerization follows your main Tactus config (recommended).
+# To run this procedure without Docker, uncomment:
+# sandbox:
+#   enabled: false
+
+# Default model for this procedure (override in .tactus/config.yml if needed).
+default_model: gpt-5.4-mini
+default_provider: openai

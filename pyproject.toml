@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guided-conversation-demo"
+version = "0.1.0"
+description = "Tactus demo: guided form intake with dynamic system prompt and CLI HITL"
+readme = "README.md"
+requires-python = ">=3.10"
+# Install Tactus first: pip install -e ../Tactus (sibling checkout)
+dependencies = []
+
+[tool.setuptools]
+packages = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pyyaml",
+  "python-dotenv>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+  "integration: real LLM calls (requires OPENAI_API_KEY)",
+]
+testpaths = ["tests"]
