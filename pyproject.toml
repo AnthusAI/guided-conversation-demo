@@ -20,11 +20,13 @@ dev = [
   "pytest-asyncio>=0.23",
   "pyyaml",
   "python-dotenv>=1.0.0",
+  "openai>=1.0",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [
   "integration: real LLM calls (requires OPENAI_API_KEY)",
+  "reliability: reliability experiment (expensive — runs each case many times)",
 ]
 testpaths = ["tests"]

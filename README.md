@@ -1,4 +1,4 @@
-# Guided conversation demo (Tactus)
+# Guided conversation demo
 
 Demonstrates a multi-turn intake chat where **procedure state** drives `{state.still_needed}` / `{state.collected_summary}` in the agent system prompt, plus **CLI HITL** via `Human.input` between assistant turns.
 
@@ -182,6 +182,72 @@ Validate only:
 
 ```bash
 tactus validate guided_form.tac
+```
+
+## Reliability experiment (the only A/B: static vs dynamic system prompt)
+
+**What you are comparing (two arms, same everything else):**
+
+| Arm | Behavior |
+|-----|----------|
+| **Static** | **`BASE_SYSTEM_PROMPT` only** — one large fixed system prompt on the agent; each turn calls `guide({ message = ... })` with **no** per-turn system override. User lines are normal chat text (no state prefix). [`complex_form_static.tac`](complex_form_static.tac) |
+| **Dynamic** | **Same `BASE_SYSTEM_PROMPT`** as static on the agent, plus an **ephemeral orchestrator suffix** each turn: `guide({ message = ..., system_prompt_suffix = hint })` (Tactus appends the hint after the rendered base system prompt; it is not stored as chat history like user/assistant turns). Procedure nudges and user lines match static. [`complex_form_dynamic.tac`](complex_form_dynamic.tac) |
+
+The API receives a **single** system string per request (base + appended hint for the dynamic arm), matching common chat providers while preserving the “ephemeral hint, normal user content” design.
+
+Same model, tools, validators, and procedure orchestration. The three **personas** in [`tests/personas.py`](tests/personas.py) are different **simulated users** (stress styles), not extra “methods.”
+
+**Metric:** *strict success* — procedure completes and every ground-truth field matches (see [`tests/test_complex_form_reliability.py`](tests/test_complex_form_reliability.py)). The harness also records **completion** (procedure finished), **infra failures** (execute/API errors, not form mistakes), and **strict success excluding infra** for comparing prompt strategies when the stack misbehaves.
+
+**Interpreting results**
+
+- **Strict success (all runs)** — headline rate including infra failures (a failed execute counts as not strict-ok).
+- **Strict success excluding infra** — strict matches divided by runs that completed execute successfully; use this to compare **static vs dynamic prompt strategy** when LiteLLM/async or API ordering errors appear in the logs.
+- **Completion rate** — fraction of runs where the procedure reported `completed` (orthogonal to field correctness).
+- **Infra failure rate** — fraction of runs where `execute` failed (exceptions, bad responses). High or **asymmetric** infra between arms usually indicates **stack or concurrency bias**, not that one prompt is worse.
+
+For **stable numbers**, keep the default **`RELIABILITY_CONCURRENCY=1`**. Raising concurrency speeds the suite but can trigger asyncio/LiteLLM flakiness.
+
+**Tool / `tool_calls` API errors:** Older Tactus builds could send chat histories where a `tool` message did not match the prior assistant `tool_calls` (duplicate synthetic ids or orphan tool rows). Current Tactus fixes this by **preserving real tool call ids** when the provider supplies them, otherwise issuing **unique ids**, and by **dropping orphan `tool` messages** before each LM call (`tactus/dspy/agent.py`, `tactus/dspy/module.py`). Use an up-to-date Tactus checkout if you still see `Invalid parameter: messages with role 'tool'…`.
+
+Optional: **`RELIABILITY_RETRY_INFRA=1`** re-runs a failed execute once per index (extra API cost).
+
+Optional: **`RELIABILITY_USER_TEMP=0.2`** lowers simulated-user sampling temperature (default `0.7`) for less variance.
+
+Optional: **`RELIABILITY_PAIR_USER_SIM=1`** passes a deterministic OpenAI **`seed`** to the user simulator derived from persona + run index so static and dynamic runs with the same index see the same user-side randomness (when the model supports `seed`).
+
+### 1) Run evaluations (same `RELIABILITY_RUNS` for both arms)
+
+The dynamic procedure uses Tactus **`system_prompt_suffix`** (appends the orchestrator hint to the agent base prompt). Use a Tactus install that includes that API (for example `pip install -e ../Tactus` from a current checkout).
+
+One pytest session runs **both** static and dynamic **×** each persona, so the arms stay comparable:
+
+```bash
+pip install -e ".[dev]"
+export OPENAI_API_KEY=...
+# Same N for every static/dynamic cell (default 20). Default concurrency is 1; raise only if you accept flakiness tradeoffs.
+RELIABILITY_RUNS=20 pytest tests/test_complex_form_reliability.py -m reliability -v -s
+# Optional: RELIABILITY_CONCURRENCY=8  # faster, less stable
+```
+
+Artifacts: `tests/results_static_<persona>.json` and `tests/results_dynamic_<persona>.json`.
+
+### 2) Quantify the difference between the two arms
+
+```bash
+python scripts/compare_reliability.py
+python scripts/compare_reliability.py --json   # also writes tests/reliability_comparison_summary.json
+```
+
+This prints **strict success (all runs)**, **strict success excluding infra** (prompt-strategy headline when infra is present), **completion**, **infra rate**, and **Δ (dynamic − static)** per table. Check stderr for **warnings** when infra is high or asymmetric between arms.
+
+**`tactus test … --mock`** only checks BDD wiring (mocked agent); it does **not** measure real-model reliability.
+
+Wiring-only (no API cost):
+
+```bash
+tactus test complex_form_static.tac --mock --param skip_hitl=true
+tactus test complex_form_dynamic.tac --mock --param skip_hitl=true
 ```
 
 ## License
