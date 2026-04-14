@@ -1,0 +1,19 @@
+// Support-flow reliability: isolate each procedure from pytest's event loop.
+digraph reliability_harness {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+  edge [fontsize=10];
+
+  Pytest [label="pytest\nasync test"];
+  Gather [label="asyncio.gather\n(N tasks)"];
+  Sem [label="Semaphore\n(concurrency cap)"];
+  Thread [label="worker thread\nasyncio.to_thread"];
+  ARun [label="asyncio.run\n(fresh loop)"];
+  Tac [label="TactusRuntime\n.execute"];
+
+  Pytest -> Gather [label="await"];
+  Gather -> Sem [label="per task"];
+  Sem -> Thread [label="schedule"];
+  Thread -> ARun [label="sync entry"];
+  ARun -> Tac [label="await"];
+}

@@ -1,0 +1,15 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.1, pytest-9.0.3, pluggy-1.6.0 -- /Users/ryan/Projects/guided-conversation-demo/.venv/bin/python3.12
+cachedir: .pytest_cache
+rootdir: /Users/ryan/Projects/guided-conversation-demo
+configfile: pyproject.toml
+plugins: logfire-4.32.0, asyncio-1.3.0, anyio-4.13.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 7 items / 1 deselected / 6 selected
+
+tests/test_support_flow_reliability.py::test_support_flow_reliability[support_static-tac_file0-support_rambler] PASSED [ 16%]
+tests/test_support_flow_reliability.py::test_support_flow_reliability[support_static-tac_file0-support_billing] PASSED [ 33%]
+tests/test_support_flow_reliability.py::test_support_flow_reliability[support_static-tac_file0-support_technical] PASSED [ 50%]
+tests/test_support_flow_reliability.py::test_support_flow_reliability[support_dynamic-tac_file1-support_rambler] PASSED [ 66%]
+tests/test_support_flow_reliability.py::test_support_flow_reliability[support_dynamic-tac_file1-support_billing] PASSED [ 83%]
+tests/test_support_flow_reliability.py::test_support_flow_reliability[support_dynamic-tac_file1-support_technical] 

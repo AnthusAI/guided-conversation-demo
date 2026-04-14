@@ -1,0 +1,159 @@
+\documentclass[11pt,a4paper]{article}
+
+% Allow embedding PDF 1.7 figures produced by GraphViz.
+\pdfminorversion=7
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{enumitem}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+\graphicspath{{diagrams/out/}}
+
+\title{Static vs.\ Dynamic System Prompts for a Regulated Support Flow:\\
+A Reliability Study with Simulated Users}
+\author{guided-conversation-demo}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Reliability is a recurring problem in agentic tasks that require both natural conversation and faithful procedure execution. A model must respond coherently to the user while also remembering ordering constraints, branch conditions, and completion criteria, and these demands can interfere with one another. We study that tension in a regulated support-flow benchmark built on Tactus. The baseline uses a \textbf{static} system prompt containing a fixed checklist. The treatment uses the same base prompt plus an \textbf{ephemeral, procedure-aware system suffix} computed by an orchestration layer each turn, including a ``Next suggested action'' hint. In a 100-run paired-user simulation study with \texttt{gpt-5.4-mini}, the dynamic condition improves mean strict success from 8.7\% to 17.7\% and mean completion from 70.0\% to 93.7\%, with 0\% infra failures in both arms. The largest gain appears on the general ``rambler'' persona, suggesting that turn-local procedural context primarily improves progress while also yielding better exact field capture.
+\end{abstract}
+
+\section{Introduction}
+Agentic tasks often ask a language model to do two difficult things at once: maintain a coherent conversation with a user and obey a structured procedure with non-negotiable constraints. In customer-support settings, those constraints may include disclosures before identifiers, branch-specific requirements, explicit approvals, and a narrow set of legal next actions. The conversational objective and the procedural objective are both cognitively demanding, and in practice they can distract from one another.
+
+This tension creates a reliability problem. A model that focuses too strongly on the conversation may miss required fields, skip disclosures, or complete a flow prematurely. A model that focuses too strongly on the checklist may become repetitive, brittle, or unhelpful in the user-facing exchange. Long static prompts can help, but they still require the model to recover the correct next step from a large block of instructions while also tracking the evolving dialogue.
+
+We study a simple alternative: separate user-facing conversation from procedural state tracking at the system-design level. In our setting, a conversational guide model handles the dialogue, while a procedural orchestration layer computes a custom, procedure-aware context representation from the current workflow state. That representation is injected as ephemeral system guidance on each turn rather than stored as ordinary chat history. The question is whether this turn-local context improves reliability relative to a single static system prompt, holding the procedure, tools, validators, and visible conversation fixed.
+
+\section{Related work}
+We omit a full survey in this draft. Relevant themes include tool-grounded language-model systems, procedural or finite-state overlays on dialogue, prompt engineering for structured tasks, and evaluation with simulated users. Citations may be added in a future revision.
+
+\section{Method}
+
+\subsection{Task and procedure}
+The paired static and dynamic support-flow procedures implement the same intake task. The flow requires a recording/privacy disclosure, issue categorization, collection of core fields, branch-specific steps for billing and technical paths, explicit plan approval, and a final \texttt{done} decision. Lua validators and guards enforce the hard ordering constraints; for example, \texttt{account\_email} cannot be recorded until the recording/privacy disclosure has been logged.
+
+\subsection{Static vs.\ dynamic prompts}
+The \textbf{static} condition calls the guide model with a fixed \texttt{BASE\_SYSTEM\_PROMPT} only. The \textbf{dynamic} condition uses the same base prompt, but augments each call with a \texttt{system\_prompt\_suffix} computed from procedure state. That suffix summarizes compliance status, remaining requirements, and a Lua-derived ``Next suggested action.'' Crucially, this orchestrator-computed context is ephemeral: it is provided to the model for the current turn, but it is not treated as ordinary user/assistant conversation history. Figure~\ref{fig:prompt} sketches the split.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.72\linewidth]{prompt_assembly.pdf}
+  \caption{Prompt assembly: shared base; dynamic arm appends an ephemeral suffix each turn.}
+  \label{fig:prompt}
+\end{figure}
+
+\subsection{Simulated user}
+\texttt{LLMHITLHandler} replaces \texttt{Human.input} with an LLM role-playing a persona with private ground-truth fields. Optional \texttt{RELIABILITY\_PAIR\_USER\_SIM=1} supplies a deterministic seed per (persona, run index) so static and dynamic runs at the same index see matched user-side randomness when the API supports it.
+
+\subsection{Reliability harness}
+For each combination of arm $\times$ persona, the test runs $N$ independent procedure executions. To avoid asyncio teardown issues under high concurrency, each execution runs inside \texttt{asyncio.run} in a worker thread, while pytest's event loop only awaits bounded parallel work guarded by a semaphore. Figure~\ref{fig:harness} summarizes the architecture.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{reliability_harness.pdf}
+  \caption{Reliability cell: pytest awaits \texttt{gather}; each run uses a fresh event loop in a worker thread.}
+  \label{fig:harness}
+\end{figure}
+
+\subsection{Single-turn flow (approximate)}
+Figure~\ref{fig:turn} gives a coarse view of one round: the guide calls a tool; tools may update Lua state or request the next user line via the simulator.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\linewidth]{procedure_turn.pdf}
+  \caption{Approximate message/tool flow for one turn (GraphViz sketch, not strict UML).}
+  \label{fig:turn}
+\end{figure}
+
+\section{Metrics}
+\begin{itemize}[noitemsep]
+  \item \textbf{Strict success:} procedure reports completed and all ground-truth fields match.
+  \item \textbf{Completion:} procedure reports completed (regardless of field correctness).
+  \item \textbf{Infra failure:} execute/API error (excluded from strict ex-infra headline when reported separately).
+\end{itemize}
+\texttt{scripts/compare\_reliability.py} prints pairwise static vs.\ dynamic tables and Wilson 95\% intervals for binomial rates (\texttt{--no-ci} to omit).
+
+\section{Experimental setup}
+\begin{itemize}[noitemsep]
+  \item Personas: \texttt{support\_rambler}, \texttt{support\_billing}, \texttt{support\_technical} (see \texttt{tests/support\_personas.py}).
+  \item Main reported run used \texttt{RELIABILITY\_RUNS=100}.
+  \item User-side randomness was paired across arms using the paired-seed setting (\texttt{RELIABILITY\_PAIR\_USER\_SIM=1}).
+  \item Concurrency for the main run was \texttt{RELIABILITY\_CONCURRENCY=20}.
+  \item The guide model for both arms was \texttt{gpt-5.4-mini}; the simulated user harness also used \texttt{gpt-5.4-mini}.
+  \item Optional \texttt{SUPPORT\_RELIABILITY\_AGENT\_MODEL} can override the guide model at test time, but those exploratory results are not analyzed in this paper.
+\end{itemize}
+
+\section{Results}
+Across all three personas, the dynamic arm outperformed the static arm on both strict success and completion in the completed 100-run paired-user study. Mean strict success improved by 9.0 percentage points (8.7\% static vs.\ 17.7\% dynamic), while mean completion improved by 23.7 percentage points (70.0\% vs.\ 93.7\%). Infra failures were 0.0\% for both arms, so the strict and strict-ex-infra headlines are identical in this experiment.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Strict success by persona over 100 runs per arm.}
+  \label{tab:strict}
+  \begin{tabular}{lrrr}
+    \toprule
+    Persona & Static & Dynamic & $\Delta$ (D$-$S) \\
+    \midrule
+    Rambler   & 2.0\%  & 16.0\% & +14.0 pp \\
+    Billing   & 16.0\% & 24.0\% & +8.0 pp \\
+    Technical & 8.0\%  & 13.0\% & +5.0 pp \\
+    \midrule
+    Mean      & 8.7\%  & 17.7\% & +9.0 pp \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Completion rate by persona over 100 runs per arm.}
+  \label{tab:completion}
+  \begin{tabular}{lrr}
+    \toprule
+    Persona & Static & Dynamic \\
+    \midrule
+    Rambler   & 51.0\% & 95.0\% \\
+    Billing   & 80.0\% & 92.0\% \\
+    Technical & 79.0\% & 94.0\% \\
+    \midrule
+    Mean      & 70.0\% & 93.7\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Wilson 95\% intervals support the strongest persona-level claim on the rambler case: strict success was 0.6--7.0\% for static versus 10.1--24.4\% for dynamic, with no overlap. Billing and technical strict intervals still overlap (billing: 10.1--24.4\% static vs.\ 16.7--33.2\% dynamic; technical: 4.1--15.0\% vs.\ 7.8--21.0\%), so those persona-level gains should be read as directionally consistent rather than individually definitive. Completion intervals show a clearer separation, especially for rambler (41.3--60.6\% static vs.\ 88.8--97.8\% dynamic).
+
+\section{Discussion}
+The results suggest that turn-local procedural context helps primarily by reducing interference between conversational behavior and procedural tracking. Completion improves sharply for all three personas, with the largest increase on the rambler persona. This is consistent with the design intent of the orchestration layer: the injected state summary and ``Next suggested action'' reduce the chance that the guide stalls, requests fields in the wrong order, or loses track of branch-specific requirements while still maintaining a natural conversation.
+
+At the same time, the dynamic arm also improves strict success overall, not just completion. The mean strict-success rate roughly doubles relative to the static arm, and the strongest persona-level effect again appears on rambler. This pattern suggests that turn-local scaffolding is not merely helping the agent \emph{finish}; it is also increasing the probability of finishing with the correct structured output. However, the absolute strict rates remain modest, so the dynamic suffix should be viewed as a meaningful improvement rather than a complete solution.
+
+The gap between completion and strict success remains important. Even when the dynamic arm completes more than 90\% of runs, many completed runs still record at least one incorrect or mismatched field. In other words, the injected procedural context appears to improve \emph{flow control} more strongly than \emph{exact data fidelity}. For practitioners, this distinction matters: a support workflow may feel much more reliable to users while still requiring additional safeguards if exact structured capture is the final objective.
+
+\section{Limitations}
+This study uses simulated users rather than real customer transcripts, so the measured gains may not transfer directly to production behavior. The main result is tied to one guide model family (\texttt{gpt-5.4-mini}) and one user-simulation setup, and API behavior may drift over time. Although paired user simulation reduces user-side variance, persona-level uncertainty remains visible in the Wilson intervals, especially for billing and technical strict success. Finally, strict success remains low in absolute terms even after the improvement, and the metric is intentionally brittle: benign differences in what is recorded can count as failure if they diverge from the ground truth or required normalized form.
+
+\section{Conclusion}
+In this support-flow harness, augmenting a conversational model with runtime-supplied procedural context outperformed a single static system prompt on the completed 100-run study. The dynamic condition improved mean strict success from 8.7\% to 17.7\% and mean completion from 70.0\% to 93.7\%, with no infra failures in either arm. The strongest effect appeared on the rambler persona, supporting the claim that turn-local procedural guidance is especially useful when the conversation is more likely to drift. The remaining gap between completion and strict success indicates that this design is best understood as a strong progress aid with secondary benefits for exact correctness, rather than a full substitute for tighter validation or richer recovery logic.
+
+\section*{Reproducibility}
+\begin{quote}
+\small\ttfamily
+RELIABILITY\_RUNS=<N> RELIABILITY\_PAIR\_USER\_SIM=1 \\
+pytest tests/test\_support\_flow\_reliability.py \\
+\hspace*{1em}-m support\_reliability -v --tb=short \\
+python scripts/compare\_reliability.py \\
+\hspace*{1em}--experiment support\_flow \\
+python scripts/build\_paper.py
+\end{quote}
+
+\end{document}

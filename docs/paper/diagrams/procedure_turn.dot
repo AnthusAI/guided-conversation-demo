@@ -1,0 +1,18 @@
+// Approximate message flow for one support-flow round (not strict UML).
+digraph procedure_turn {
+  rankdir=TB;
+  node [shape=box, style=rounded];
+  edge [fontsize=10];
+
+  User [label="Simulated user\n(LLMHITLHandler)"];
+  Guide [label="Guide agent\n(OpenAI + tools)"];
+  Tools [label="Inline tools\n(record_field,\nrecord_compliance,\nchat_only)"];
+  Lua [label="Lua procedure\nvalidators + state"];
+  HITL [label="Human.input\n→ user sim API"];
+
+  User -> Guide [label="user message"];
+  Guide -> Tools [label="required tool"];
+  Tools -> Lua [label="read/write\nstate.form_*"];
+  Tools -> HITL [label="need reply"];
+  HITL -> User [label="completion"];
+}

@@ -184,7 +184,7 @@ Validate only:
 tactus validate guided_form.tac
 ```
 
-## Reliability experiment (the only A/B: static vs dynamic system prompt)
+## Reliability experiments (static vs dynamic system prompt, quantified)
 
 **What you are comparing (two arms, same everything else):**
 
@@ -249,6 +249,66 @@ Wiring-only (no API cost):
 tactus test complex_form_static.tac --mock --param skip_hitl=true
 tactus test complex_form_dynamic.tac --mock --param skip_hitl=true
 ```
+
+### Support flow A/B (disclosures, branching, approval)
+
+Paired procedures model a **support-style** conversation with **control flow**:
+
+- **Issue category** branches: `general`, `billing`, or `technical` (extra fields per branch).
+- **Compliance:** `record_compliance` with **`note_to_user`** (full disclosure text the user heard) for **recording/privacy** (before account email) and **fee terms** (billing path only, before billing acknowledgment).
+- **Approval:** `plan_approval` must be recorded as `yes` after the agent explains the resolution plan.
+- Lua enforces ordering (e.g. no `account_email` until recording disclosure is logged; billing fee disclosure before `billing_charge_acknowledged`).
+
+| File | Role |
+|------|------|
+| [`support_flow_static.tac`](support_flow_static.tac) | Static `BASE_SYSTEM_PROMPT` only |
+| [`support_flow_dynamic.tac`](support_flow_dynamic.tac) | Same base + ephemeral **`system_prompt_suffix`** (**Next suggested action**, compliance flags, still-to-collect) |
+
+The **programmatic** arm (`support_flow_programmatic.tac`) additionally enables **Agent-level retry** (configured on the `guide = Agent { ... }` block via `retry = { ... }`). This retries a single agent turn on infra failures and, optionally, validation failures, truncating the agent’s history back to the start of the attempted turn.
+
+Personas and ground truth: [`tests/support_personas.py`](tests/support_personas.py) (`support_rambler` → general, `support_billing` → billing, `support_technical` → technical).
+
+Run reliability (same env vars as complex form; default procedure/test cap is **58** user rounds — override with `SUPPORT_RELIABILITY_MAX_TURNS` if needed). **`test_support_flow_reliability` defaults `RELIABILITY_CONCURRENCY` to 20** (all runs in a cell in parallel); set `RELIABILITY_CONCURRENCY=1` if you need the slower, more rate-limit-friendly sequential mode. If completion is still noisy, try calibrating on **general + billing** personas first (`support_rambler`, `support_billing`) before leaning on `support_technical`.
+
+Each reliability **run** uses **`asyncio.run` in a worker thread** (`asyncio.to_thread`) so procedure execution does not share pytest’s asyncio loop—this reduces teardown flakiness when `RELIABILITY_CONCURRENCY` is high.
+
+Optional **`SUPPORT_RELIABILITY_AGENT_MODEL`** overrides the guide’s OpenAI model in the `.tac` source at runtime (default matches `support_flow_*.tac`: `gpt-5.4-mini`). Non-default models write artifacts with a suffix, e.g. `gpt-5-nano` → `tests/results_support_static_<persona>_gpt_5_nano.json`.
+
+```bash
+RELIABILITY_RUNS=20 pytest tests/test_support_flow_reliability.py -m support_reliability -v -s
+SUPPORT_RELIABILITY_AGENT_MODEL=gpt-5-nano RELIABILITY_RUNS=20 pytest tests/test_support_flow_reliability.py -m support_reliability -v -s
+```
+
+**Larger runs (e.g. N=100):** Set `RELIABILITY_RUNS=100`. For **fair static vs dynamic comparison**, enable **`RELIABILITY_PAIR_USER_SIM=1`** so the user simulator uses a **deterministic OpenAI `seed`** per persona and run index (same index → same user-side randomness across arms). If you hit **rate limits**, lower `RELIABILITY_CONCURRENCY` (e.g. `12`) or set **`RELIABILITY_RETRY_INFRA=1`** for one retry on failed execute. With **more than 10 runs**, pytest stdout **omits per-run lines and the long `Detail` blob** unless you set **`SUPPORT_RELIABILITY_VERBOSE_DETAIL=1`** (full detail remains in the JSON artifacts).
+
+Example 100-run paired session:
+
+```bash
+export RELIABILITY_RUNS=100
+export RELIABILITY_PAIR_USER_SIM=1
+pytest tests/test_support_flow_reliability.py -m support_reliability -v --tb=short
+```
+
+Artifacts: `tests/results_support_static_<persona>.json` and `tests/results_support_dynamic_<persona>.json` (plus optional `_<model_slug>` suffix when using `SUPPORT_RELIABILITY_AGENT_MODEL`).
+
+Compare:
+
+```bash
+python scripts/compare_reliability.py --experiment support_flow
+python scripts/compare_reliability.py --experiment support_flow --results-suffix _gpt_5_nano
+python scripts/compare_reliability.py --experiment support_flow --no-ci   # hide Wilson 95% intervals
+python scripts/compare_reliability.py --experiment support_flow --json   # tests/support_reliability_comparison_summary.json
+```
+
+### Experiment writeup (LaTeX + GraphViz)
+
+A draft **research-style paper** (support-flow static vs dynamic reliability) lives under [`docs/paper/`](docs/paper/). Build PDF + diagrams:
+
+```bash
+python scripts/build_paper.py
+```
+
+Watch mode (after `pip install -e ".[docs]"`): `python scripts/build_paper.py --watch`. See [`docs/paper/README.md`](docs/paper/README.md) for prerequisites (`pdflatex`, `dot`).
 
 ## License
 

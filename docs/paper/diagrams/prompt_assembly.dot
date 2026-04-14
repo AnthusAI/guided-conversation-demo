@@ -1,0 +1,15 @@
+// Static vs dynamic system prompt for the guide agent (A/B).
+digraph prompt_assembly {
+  rankdir=TB;
+  node [shape=box, style=rounded];
+  edge [fontsize=10];
+
+  Base [label="BASE_SYSTEM_PROMPT\n(shared checklist)"];
+  Static [label="Static arm\nsystem = BASE only"];
+  Dyn [label="Dynamic arm\nsystem = BASE +\nephemeral suffix"];
+  Suf [label="orchestrator_suffix\n(Next suggested action,\nflags, still-to-collect)"];
+
+  Base -> Static;
+  Base -> Dyn;
+  Suf -> Dyn [label="append per turn"];
+}
