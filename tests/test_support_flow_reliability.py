@@ -168,45 +168,119 @@ async def _run_once(tac_file: Path, persona_name: str, run_index: int) -> dict:
     return await asyncio.to_thread(_run_once_in_thread, tac_file, persona_name, run_index)
 
 
-def _is_strict_success(exec_result: dict, persona_name: str) -> bool:
+def _normalize_text(value) -> str:
+    return str(value).strip().lower()
+
+
+def _strict_eval(exec_result: dict, persona_name: str) -> tuple[bool, list[dict]]:
     res = exec_result.get("result") or {}
     gt = SUPPORT_PERSONAS[persona_name]["ground_truth"]
+    failures: list[dict] = []
 
     if not res.get("completed"):
-        return False
+        failures.append(
+            {
+                "code": "not_completed",
+                "field": "completed",
+                "expected": True,
+                "actual": res.get("completed"),
+            }
+        )
+        return False, failures
 
     for field, expected in gt.items():
         actual = res.get(field)
         if field == "issue_summary":
             # issue_summary is a generated summary; require existence, not exact match.
             if actual is None:
-                return False
+                failures.append(
+                    {
+                        "code": "missing_field",
+                        "field": field,
+                        "expected": "non-empty summary",
+                        "actual": actual,
+                    }
+                )
+                continue
             if len(str(actual).strip()) < 5:
-                return False
+                failures.append(
+                    {
+                        "code": "issue_summary_too_short",
+                        "field": field,
+                        "expected": "len >= 5",
+                        "actual": actual,
+                    }
+                )
             continue
         if isinstance(expected, bool):
             if actual is not True and actual is not False:
-                return False
+                failures.append(
+                    {
+                        "code": "invalid_boolean",
+                        "field": field,
+                        "expected": expected,
+                        "actual": actual,
+                    }
+                )
+                continue
             if bool(actual) != bool(expected):
-                return False
+                failures.append(
+                    {
+                        "code": "value_mismatch",
+                        "field": field,
+                        "expected": expected,
+                        "actual": actual,
+                    }
+                )
             continue
         if actual is None:
-            return False
-        if str(actual).strip().lower() != str(expected).strip().lower():
-            return False
+            failures.append(
+                {
+                    "code": "missing_field",
+                    "field": field,
+                    "expected": expected,
+                    "actual": actual,
+                }
+            )
+            continue
+        if _normalize_text(actual) != _normalize_text(expected):
+            failures.append(
+                {
+                    "code": "value_mismatch",
+                    "field": field,
+                    "expected": expected,
+                    "actual": actual,
+                }
+            )
 
-    return True
+    return len(failures) == 0, failures
 
 
-def _classify_outcome(out: dict, persona_name: str) -> str:
+def _is_strict_success(exec_result: dict, persona_name: str) -> bool:
+    ok, _ = _strict_eval(exec_result, persona_name)
+    return ok
+
+
+def _classify_outcome(out: dict, strict_ok: bool) -> str:
     if not out.get("success"):
         return "infra_error"
     res = out.get("result") or {}
     if not res.get("completed"):
         return "incomplete"
-    if _is_strict_success(out, persona_name):
+    if strict_ok:
         return "strict_ok"
     return "completed_strict_fail"
+
+
+def _result_focus(res: dict, persona_name: str) -> dict:
+    gt = SUPPORT_PERSONAS[persona_name]["ground_truth"]
+    focused = {
+        "completed": res.get("completed"),
+        "turns": res.get("turns"),
+    }
+    for field in gt:
+        focused[field] = res.get(field)
+    return focused
 
 
 def _retry_infra_enabled() -> bool:
@@ -275,8 +349,8 @@ async def test_support_flow_reliability(variant, tac_file, persona_name):
     verifier_branch_ok = 0
     results = []
     for i, out in indexed:
-        ok = _is_strict_success(out, persona_name)
-        outcome = _classify_outcome(out, persona_name)
+        ok, strict_fail_reasons = _strict_eval(out, persona_name)
+        outcome = _classify_outcome(out, ok)
         successes += int(ok)
         if outcome == "infra_error":
             infra_count += 1
@@ -300,6 +374,8 @@ async def test_support_flow_reliability(variant, tac_file, persona_name):
                 "error": out.get("error"),
                 "status": out.get("status"),
                 "verifier": (v.as_dict() if v else None),
+                "strict_fail_reasons": ([] if ok else strict_fail_reasons),
+                "result_focus": (_result_focus(res, persona_name) if isinstance(res, dict) else None),
             }
         )
         if not _support_compact_stdout():
