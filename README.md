@@ -300,6 +300,35 @@ python scripts/compare_reliability.py --experiment support_flow --no-ci   # hide
 python scripts/compare_reliability.py --experiment support_flow --json   # tests/support_reliability_comparison_summary.json
 ```
 
+### Elicitation-style support flow (guided vs unguided)
+
+This experiment models the MCP *elicitation* idea (structured, client-mediated data capture) **without** an MCP server, purely in Tactus procedures:
+
+- **Unguided baseline**: the LLM is responsible for tracking workflow state and choosing when/how to capture fields.
+- **Guided elicitation-style**: the procedure triggers explicit **form checkpoints** (accept/decline/cancel) for branch-critical fields and validates/stores responses programmatically.
+
+Files:
+
+| File | Role |
+|------|------|
+| [`support_flow_elicitation_unguided.tac`](support_flow_elicitation_unguided.tac) | Less-prescriptive agent prompt; LLM keeps state |
+| [`support_flow_elicitation_guided.tac`](support_flow_elicitation_guided.tac) | Procedure-driven elicitation-style checkpoints |
+
+Run reliability:
+
+```bash
+RELIABILITY_RUNS=20 pytest tests/test_support_elicitation_reliability.py -m support_elicitation_reliability -v --tb=short
+```
+
+Artifacts: `tests/results_support_elicitation_unguided_<persona>.json` and `tests/results_support_elicitation_guided_<persona>.json` (plus optional `_<run_tag>` suffix via `SUPPORT_RELIABILITY_RUN_TAG`).
+
+Compare:
+
+```bash
+python scripts/compare_reliability.py --experiment support_elicitation
+python scripts/compare_reliability.py --experiment support_elicitation --json   # tests/support_elicitation_reliability_comparison_summary.json
+```
+
 ### Experiment writeup (LaTeX + GraphViz)
 
 A draft **research-style paper** (support-flow static vs dynamic reliability) lives under [`docs/paper/`](docs/paper/). Build PDF + diagrams:

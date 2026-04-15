@@ -79,6 +79,16 @@ EXPERIMENTS = {
         "baseline_variant": "support_static",
         "summary_filename": "support_reliability_comparison_summary.json",
     },
+    "support_elicitation": {
+        "label": "Support flow (elicitation-style checkpoints)",
+        "personas": ("support_rambler", "support_billing", "support_technical"),
+        "variants": (
+            "support_elicitation_unguided",
+            "support_elicitation_guided",
+        ),
+        "baseline_variant": "support_elicitation_unguided",
+        "summary_filename": "support_elicitation_reliability_comparison_summary.json",
+    },
 }
 
 # Flag asymmetric infra so comparisons are not read as prompt effects.
