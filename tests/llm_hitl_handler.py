@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -24,6 +25,11 @@ Strict rules:
 - If the assistant asks for something you have already provided, gently point that out.
 - If the assistant says a value you gave was incorrectly formatted, acknowledge it and provide the corrected version on this turn (consistent with your persona's correction behavior).
 - The conversation so far is in the messages array — do not repeat yourself.
+
+Elicitation-style prompts:
+- If the assistant message contains "[ELICITATION · FORM]" and asks for a specific field (email, phone, device model, approval),
+  respond with ONLY the requested value (no extra words), using your private information above.
+- If asked for approval/acknowledgment fields, respond with: yes
 """
 
 
@@ -55,6 +61,30 @@ class LLMHITLHandler:
     def request_interaction(
         self, procedure_id: str, request: HITLRequest, execution_context=None
     ) -> HITLResponse:
+        # Elicitation-style "form" prompts should behave like a user filling a form:
+        # return the exact ground-truth value for the requested field(s), without LLM variability.
+        msg = request.message or ""
+        if "[ELICITATION · FORM]" in msg:
+            # Keep regex simple (avoid any pattern portability surprises).
+            m = re.search(r"\(Required:\s*([^)]+)\)", msg)
+            if m:
+                required = [s.strip() for s in m.group(1).split(",") if s.strip()]
+            else:
+                required = []
+
+            # If we can't parse the field name, fall back to the LLM.
+            if required:
+                field = required[0]
+                value = self.ground_truth.get(field)
+                if value is None and field in ("plan_approval", "billing_charge_acknowledged"):
+                    value = "yes"
+                reply = str(value) if value is not None else ""
+                return HITLResponse(
+                    value=reply,
+                    responded_at=datetime.now(timezone.utc),
+                    timed_out=False,
+                )
+
         from openai import OpenAI
 
         client = OpenAI(api_key=self.api_key)
@@ -63,7 +93,9 @@ class LLMHITLHandler:
             ground_truth_json=json.dumps(self.ground_truth, indent=2),
         )
 
-        self._history.append({"role": "user", "content": request.message})
+        # The procedure is prompting the human; in the simulated chat history,
+        # that prompt is the ASSISTANT message and we sample the USER reply.
+        self._history.append({"role": "assistant", "content": request.message})
 
         # gpt-5.x and newer chat models reject max_tokens; use max_completion_tokens.
         create_kwargs: dict[str, Any] = {
@@ -78,7 +110,7 @@ class LLMHITLHandler:
 
         content = response.choices[0].message.content
         reply = (content or "").strip()
-        self._history.append({"role": "assistant", "content": reply})
+        self._history.append({"role": "user", "content": reply})
 
         return HITLResponse(
             value=reply,

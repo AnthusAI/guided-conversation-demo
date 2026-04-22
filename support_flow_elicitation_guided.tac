@@ -248,22 +248,66 @@ local function parse_elicitation_response(raw)
     return action, content
 end
 
-local function elicitation_form(prompt_title, message, requested_schema, required_fields, attempts, reply_queue)
+local function _extract_for_field(field_name, raw, default_value)
+    local f = _lower(_trim(field_name))
+    local s = _trim(raw)
+    if s == "" then return "" end
+
+    if f == "account_email" then
+        local email = s:match("([%w%._%+%-]+@[%w%.%-]+%.[%a]+)")
+        if email then
+            email = email:gsub("[%,%;%:]$", "")
+            return email
+        end
+        -- Common spoken-style fallback: "sam at home dot net" -> "sam@home.net"
+        local normalized = _lower(s)
+        normalized = normalized:gsub("%s+at%s+", "@")
+        normalized = normalized:gsub("%s+dot%s+", ".")
+        normalized = normalized:gsub("%s+", "")
+        local email2 = normalized:match("([%w%._%+%-]+@[%w%.%-]+%.[%a]+)")
+        if email2 then
+            return email2
+        end
+        return s
+    end
+
+    if f == "callback_phone" then
+        local phone = s:match("(%d%d%d%-%d%d%d%-%d%d%d%d)")
+        if phone then
+            return phone
+        end
+        local digits = s:gsub("%D", "")
+        if #digits >= 10 then
+            digits = digits:sub(1, 10)
+            return digits:sub(1, 3) .. "-" .. digits:sub(4, 6) .. "-" .. digits:sub(7, 10)
+        end
+        return s
+    end
+
+    if f == "issue_category" then
+        if _contains(s, ISSUE_TECH) or _contains(s, "tech") then return ISSUE_TECH end
+        if _contains(s, ISSUE_BILLING) or _contains(s, "bill") then return ISSUE_BILLING end
+        if _contains(s, ISSUE_GENERAL) then return ISSUE_GENERAL end
+        return tostring(default_value or s)
+    end
+
+    if f == "billing_charge_acknowledged" or f == "plan_approval" then
+        if _contains(s, "yes") then return "yes" end
+        return s
+    end
+
+    return s
+end
+
+local function elicitation_form(prompt_title, message, requested_schema, required_fields, attempts, reply_queue, defaults)
     attempts = attempts or 2
-    local schema_text = tostring(requested_schema or "")
     local required_text = table.concat(required_fields or {}, ", ")
 
     local prompt = ""
         .. "[ELICITATION · FORM] " .. tostring(prompt_title or "Request") .. "\n"
-        .. tostring(message or "") .. "\n\n"
-        .. "Requested schema (informative):\n" .. schema_text .. "\n\n"
-        .. "Reply format (exact; one per line):\n"
-        .. "action=accept|decline|cancel\n"
-        .. "field=value\n"
-        .. "(required fields: " .. required_text .. ")\n"
-        .. "Example:\n"
-        .. "action=accept\n"
-        .. (required_fields and required_fields[1] and (required_fields[1] .. "=...") or "field=value") .. "\n"
+        .. tostring(message or "") .. "\n"
+        .. "(Required: " .. required_text .. ")\n"
+        .. "Reply with just the value.\n"
 
     for _ = 1, attempts do
         local raw
@@ -273,16 +317,29 @@ local function elicitation_form(prompt_title, message, requested_schema, require
             end
             raw = table.remove(reply_queue, 1)
         else
-            raw = Human.input({prompt = prompt})
+            raw = Human.input({message = prompt})
         end
-        local action, content = parse_elicitation_response(raw)
+
+        local raw_s = tostring(raw or "")
+        local action, parsed = parse_elicitation_response(raw_s)
         if action == "decline" or action == "cancel" then
             return action, {}
         end
-        if action ~= "accept" then
-            -- treat malformed as cancel to avoid loops
-            return "cancel", {}
+
+        local content = {}
+        if action == "accept" and parsed and next(parsed) ~= nil then
+            content = parsed
+        else
+            -- Natural-language fallback: treat as accept and extract per field.
+            for _, f in ipairs(required_fields or {}) do
+                local dv = nil
+                if defaults ~= nil then
+                    dv = defaults[_lower(f)]
+                end
+                content[_lower(f)] = _extract_for_field(f, raw_s, dv)
+            end
         end
+
         local ok = true
         for _, f in ipairs(required_fields or {}) do
             if content[_lower(f)] == nil or content[_lower(f)] == "" then
@@ -473,6 +530,21 @@ Procedure {
                 (input.kickoff or "Hello.") .. "\n\nSYSTEM: Start by delivering recording/privacy disclosure and logging it with record_compliance(recording_privacy)."
             )
         )
+        if state.compliance_recording_done ~= true then
+            run_guide(
+                " · compliance",
+                wrap_user_message(
+                    "SYSTEM: You must now call record_compliance with kind=recording_privacy and include the full disclosure text in note_to_user."
+                )
+            )
+        end
+        if state.compliance_recording_done ~= true then
+            _trace_violation("compliance:recording_privacy", "procedure fallback: mark complete")
+            state.compliance_recording_done = true
+            _trace_step("compliance:recording_privacy")
+            state.last_user_message =
+                "For quality and training, this call may be recorded. We use your information to help resolve your request."
+        end
 
         -- 2) Elicit issue summary first (used to derive and then confirm issue_category).
         refresh_summaries()
@@ -511,7 +583,8 @@ Procedure {
             '{\"type\":\"object\",\"properties\":{\"issue_category\":{\"type\":\"string\",\"enum\":[\"general\",\"billing\",\"technical\"],\"default\":\"' .. tostring(predicted) .. '\"}},\"required\":[\"issue_category\"]}',
             {"issue_category"},
             2,
-            reply_queue
+            reply_queue,
+            {issue_category = predicted}
         )
         if act_cat ~= "accept" then
             return {
@@ -530,45 +603,196 @@ Procedure {
                 violations = state._violations or {},
             }
         end
-        record_field_programmatically("issue_category", cont_cat["issue_category"], "Got it — thanks.")
-
-        -- 3) Core fields.
-        local act_email, cont_email = elicitation_form(
-            "Account email",
-            "Please provide the email address on the account.",
-            '{\"type\":\"object\",\"properties\":{\"account_email\":{\"type\":\"string\",\"format\":\"email\"}},\"required\":[\"account_email\"]}',
-            {"account_email"},
-            2,
-            reply_queue
-        )
-        if act_email == "accept" then
-            record_field_programmatically("account_email", cont_email["account_email"], "Thanks — I’ve recorded your account email.")
+        local ok_cat, err_cat = record_field_programmatically("issue_category", cont_cat["issue_category"], "Got it — thanks.")
+        if not ok_cat then
+            _trace_violation("field:issue_category", "elicitation validation failed; using inferred category")
+            record_field_programmatically(
+                "issue_category",
+                predicted,
+                "To keep things moving, I’m routing this based on your issue description."
+            )
         end
 
-        local act_phone, cont_phone = elicitation_form(
-            "Callback phone",
-            "Please provide a callback number in the format XXX-XXX-XXXX.",
-            '{\"type\":\"object\",\"properties\":{\"callback_phone\":{\"type\":\"string\",\"pattern\":\"^\\\\\\\\d{3}-\\\\\\\\d{3}-\\\\\\\\d{4}$\"}},\"required\":[\"callback_phone\"]}',
-            {"callback_phone"},
-            2,
-            reply_queue
-        )
-        if act_phone == "accept" then
-            record_field_programmatically("callback_phone", cont_phone["callback_phone"], "Thanks — I’ve recorded your callback phone number.")
+        -- 3) Core fields.
+        local email_attempts = 3
+        while email_attempts > 0 and (state.form_account_email == nil or state.form_account_email == "") do
+            local act_email, cont_email = elicitation_form(
+                "Account email",
+                "Please provide the email address on the account.",
+                '{\"type\":\"object\",\"properties\":{\"account_email\":{\"type\":\"string\",\"format\":\"email\"}},\"required\":[\"account_email\"]}',
+                {"account_email"},
+                1,
+                reply_queue
+            )
+            if act_email ~= "accept" then
+                break
+            end
+            local ok_email, err_email = record_field_programmatically(
+                "account_email",
+                cont_email["account_email"],
+                "Thanks — I’ve recorded your account email."
+            )
+            if ok_email then
+                break
+            end
+            email_attempts = email_attempts - 1
+            _trace_violation("field:account_email", "elicitation retry: " .. tostring(err_email or ""))
+        end
+        if state.form_account_email == nil or state.form_account_email == "" then
+            run_guide(
+                " · email",
+                wrap_user_message(
+                    "SYSTEM: We still need the account email. Ask the user again for the email address on the account."
+                )
+            )
+            local email_attempts2 = 2
+            while email_attempts2 > 0 and (state.form_account_email == nil or state.form_account_email == "") do
+                local act_email, cont_email = elicitation_form(
+                    "Account email",
+                    "Please provide the email address on the account.",
+                    '{\"type\":\"object\",\"properties\":{\"account_email\":{\"type\":\"string\",\"format\":\"email\"}},\"required\":[\"account_email\"]}',
+                    {"account_email"},
+                    1,
+                    reply_queue
+                )
+                if act_email ~= "accept" then
+                    break
+                end
+                local ok_email, err_email = record_field_programmatically(
+                    "account_email",
+                    cont_email["account_email"],
+                    "Thanks — I’ve recorded your account email."
+                )
+                if ok_email then
+                    break
+                end
+                email_attempts2 = email_attempts2 - 1
+                _trace_violation("field:account_email", "elicitation retry2: " .. tostring(err_email or ""))
+            end
+        end
+
+        local phone_attempts = 3
+        while phone_attempts > 0 and (state.form_callback_phone == nil or state.form_callback_phone == "") do
+            local act_phone, cont_phone = elicitation_form(
+                "Callback phone",
+                "Please provide a callback number in the format XXX-XXX-XXXX (digits and dashes only).",
+                '{\"type\":\"object\",\"properties\":{\"callback_phone\":{\"type\":\"string\",\"pattern\":\"^\\\\\\\\d{3}-\\\\\\\\d{3}-\\\\\\\\d{4}$\"}},\"required\":[\"callback_phone\"]}',
+                {"callback_phone"},
+                1,
+                reply_queue
+            )
+            if act_phone ~= "accept" then
+                break
+            end
+            local ok_phone, err_phone = record_field_programmatically(
+                "callback_phone",
+                cont_phone["callback_phone"],
+                "Thanks — I’ve recorded your callback phone number."
+            )
+            if ok_phone then
+                break
+            end
+            phone_attempts = phone_attempts - 1
+            _trace_violation("field:callback_phone", "elicitation retry: " .. tostring(err_phone or ""))
+        end
+        if state.form_callback_phone == nil or state.form_callback_phone == "" then
+            run_guide(
+                " · phone",
+                wrap_user_message(
+                    "SYSTEM: We still need a callback phone number. Ask again and request it as XXX-XXX-XXXX."
+                )
+            )
+            local phone_attempts2 = 2
+            while phone_attempts2 > 0 and (state.form_callback_phone == nil or state.form_callback_phone == "") do
+                local act_phone, cont_phone = elicitation_form(
+                    "Callback phone",
+                    "Please provide a callback number as XXX-XXX-XXXX.",
+                    '{\"type\":\"object\",\"properties\":{\"callback_phone\":{\"type\":\"string\",\"pattern\":\"^\\\\\\\\d{3}-\\\\\\\\d{3}-\\\\\\\\d{4}$\"}},\"required\":[\"callback_phone\"]}',
+                    {"callback_phone"},
+                    1,
+                    reply_queue
+                )
+                if act_phone ~= "accept" then
+                    break
+                end
+                local ok_phone, err_phone = record_field_programmatically(
+                    "callback_phone",
+                    cont_phone["callback_phone"],
+                    "Thanks — I’ve recorded your callback phone number."
+                )
+                if ok_phone then
+                    break
+                end
+                phone_attempts2 = phone_attempts2 - 1
+                _trace_violation("field:callback_phone", "elicitation retry2: " .. tostring(err_phone or ""))
+            end
+        end
+
+        -- Hard gate: do not proceed to plan/approval if core fields missing.
+        if state.form_account_email == nil or state.form_account_email == "" then
+            _trace_violation("field:account_email", "procedure abort: missing after retries")
+            refresh_summaries()
+            return {
+                completed = false,
+                turns = turns,
+                issue_category = state.form_issue_category,
+                account_email = state.form_account_email,
+                issue_summary = state.form_issue_summary,
+                callback_phone = state.form_callback_phone,
+                device_model = state.form_device_model,
+                billing_charge_acknowledged = state.form_billing_charge_acknowledged,
+                plan_approval = state.form_plan_approval,
+                compliance_recording_done = state.compliance_recording_done == true,
+                compliance_fee_done = state.compliance_fee_done == true,
+                step_trace = state._step_trace or {},
+                violations = state._violations or {},
+            }
+        end
+        if state.form_callback_phone == nil or state.form_callback_phone == "" then
+            _trace_violation("field:callback_phone", "procedure abort: missing after retries")
+            refresh_summaries()
+            return {
+                completed = false,
+                turns = turns,
+                issue_category = state.form_issue_category,
+                account_email = state.form_account_email,
+                issue_summary = state.form_issue_summary,
+                callback_phone = state.form_callback_phone,
+                device_model = state.form_device_model,
+                billing_charge_acknowledged = state.form_billing_charge_acknowledged,
+                plan_approval = state.form_plan_approval,
+                compliance_recording_done = state.compliance_recording_done == true,
+                compliance_fee_done = state.compliance_fee_done == true,
+                step_trace = state._step_trace or {},
+                violations = state._violations or {},
+            }
         end
 
         -- 4) Branch-dependent fields and disclosures.
         if state.form_issue_category == ISSUE_TECH then
-            local act_dev, cont_dev = elicitation_form(
-                "Device model",
-                "Please provide the device or hardware model.",
-                '{\"type\":\"object\",\"properties\":{\"device_model\":{\"type\":\"string\",\"minLength\":2}},\"required\":[\"device_model\"]}',
-                {"device_model"},
-                2,
-                reply_queue
-            )
-            if act_dev == "accept" then
-                record_field_programmatically("device_model", cont_dev["device_model"], "Thanks — I’ve recorded the device model.")
+            local dev_attempts = 3
+            while dev_attempts > 0 and (state.form_device_model == nil or state.form_device_model == "") do
+                local act_dev, cont_dev = elicitation_form(
+                    "Device model",
+                    "Please provide the device or hardware model (example: ACME Router X200).",
+                    '{\"type\":\"object\",\"properties\":{\"device_model\":{\"type\":\"string\",\"minLength\":2}},\"required\":[\"device_model\"]}',
+                    {"device_model"},
+                    1,
+                    reply_queue
+                )
+                if act_dev ~= "accept" then
+                    break
+                end
+                local ok_dev, err_dev = record_field_programmatically(
+                    "device_model",
+                    cont_dev["device_model"],
+                    "Thanks — I’ve recorded the device model."
+                )
+                if ok_dev then
+                    break
+                end
+                dev_attempts = dev_attempts - 1
+                _trace_violation("field:device_model", "elicitation retry: " .. tostring(err_dev or ""))
             end
         elseif state.form_issue_category == ISSUE_BILLING then
             run_guide(
@@ -577,6 +801,21 @@ Procedure {
                     "SYSTEM: Deliver the fee terms disclosure for billing and log it with record_compliance(fee_terms)."
                 )
             )
+            if state.compliance_fee_done ~= true then
+                run_guide(
+                    " · fee (retry)",
+                    wrap_user_message(
+                        "SYSTEM: You must call record_compliance with kind=fee_terms and include the full disclosure text in note_to_user."
+                    )
+                )
+            end
+            if state.compliance_fee_done ~= true then
+                _trace_violation("compliance:fee_terms", "procedure fallback: mark complete")
+                state.compliance_fee_done = true
+                _trace_step("compliance:fee_terms")
+                state.last_user_message =
+                    "Billing note: there may be a $29.99 research fee, credited back if we confirm the error."
+            end
             local act_ack, cont_ack = elicitation_form(
                 "Billing fee acknowledgment",
                 "Do you acknowledge the billing fee terms? (Answer yes to proceed.)",
@@ -586,7 +825,29 @@ Procedure {
                 reply_queue
             )
             if act_ack == "accept" then
-                record_field_programmatically("billing_charge_acknowledged", cont_ack["billing_charge_acknowledged"], "Thanks — I’ve recorded your acknowledgment.")
+                local ok_ack, err_ack = record_field_programmatically(
+                    "billing_charge_acknowledged",
+                    cont_ack["billing_charge_acknowledged"],
+                    "Thanks — I’ve recorded your acknowledgment."
+                )
+                if not ok_ack then
+                    _trace_violation("field:billing_charge_acknowledged", "elicitation retry: " .. tostring(err_ack or ""))
+                    local act_ack2, cont_ack2 = elicitation_form(
+                        "Billing fee acknowledgment (retry)",
+                        "Please reply with exactly: yes",
+                        '{\"type\":\"object\",\"properties\":{\"billing_charge_acknowledged\":{\"type\":\"string\",\"enum\":[\"yes\"]}},\"required\":[\"billing_charge_acknowledged\"]}',
+                        {"billing_charge_acknowledged"},
+                        1,
+                        reply_queue
+                    )
+                    if act_ack2 == "accept" then
+                        record_field_programmatically(
+                            "billing_charge_acknowledged",
+                            cont_ack2["billing_charge_acknowledged"],
+                            "Thanks — I’ve recorded your acknowledgment."
+                        )
+                    end
+                end
             end
         end
 
@@ -606,7 +867,29 @@ Procedure {
             reply_queue
         )
         if act_appr == "accept" then
-            record_field_programmatically("plan_approval", cont_appr["plan_approval"], "Great — I’ve recorded your approval.")
+            local ok_appr, err_appr = record_field_programmatically(
+                "plan_approval",
+                cont_appr["plan_approval"],
+                "Great — I’ve recorded your approval."
+            )
+            if not ok_appr then
+                _trace_violation("field:plan_approval", "elicitation retry: " .. tostring(err_appr or ""))
+                local act_appr2, cont_appr2 = elicitation_form(
+                    "Plan approval (retry)",
+                    "Please reply with exactly: yes",
+                    '{\"type\":\"object\",\"properties\":{\"plan_approval\":{\"type\":\"string\",\"enum\":[\"yes\"]}},\"required\":[\"plan_approval\"]}',
+                    {"plan_approval"},
+                    1,
+                    reply_queue
+                )
+                if act_appr2 == "accept" then
+                    record_field_programmatically(
+                        "plan_approval",
+                        cont_appr2["plan_approval"],
+                        "Great — I’ve recorded your approval."
+                    )
+                end
+            end
         end
 
         -- 6) Finish.

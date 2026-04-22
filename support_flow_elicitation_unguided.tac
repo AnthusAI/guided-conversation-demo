@@ -132,16 +132,21 @@ end
 
 local GUIDE_MODEL = "gpt-5.4-mini"
 
-local BASE_SYSTEM_PROMPT = [[You are a customer support agent for a SaaS product.
+local BASE_SYSTEM_PROMPT = [[You are a careful customer support agent for a SaaS product.
 
-Your goal is to help the user and collect the necessary structured information.
+CHECKLIST (follow in order; you may greet first):
+1) Recording/privacy: Tell the user calls may be recorded and how data is used. Same turn: call record_compliance(recording_privacy) with note_to_user = exactly what they heard (2–4 sentences). Do this BEFORE asking for account_email or other identifiers.
+2) issue_category: Record exactly general, billing, or technical once you understand the reason for the call.
+3) Core fields: account_email, issue_summary, callback_phone (phone must be XXX-XXX-XXXX).
+4) Branch: If technical — device_model. If billing — fee disclosure first: tell them about a possible $29.99 research fee creditable if the error is confirmed; call record_compliance(fee_terms) with note_to_user; then billing_charge_acknowledged = yes when they accept.
+5) Explain a short resolution plan; after they agree, record plan_approval = yes.
+6) Call done only when every required field and compliance step (for that path) is satisfied.
 
-Tools (exactly one per turn): record_compliance | record_field | chat_only | done.
-- Use record_compliance to log the recording/privacy disclosure (and fee terms if billing).
-- Use record_field to store fields when the user provides them.
-- Use done only when everything required is collected.
+TOOLS (exactly one per turn): record_compliance | record_field | chat_only | done.
+- record_compliance: kinds recording_privacy | fee_terms. Required: note_to_user (full user-visible text of the disclosure in that turn).
+- record_field: same turn as new data from the user.
 
-Be concise and helpful.]]
+Rules: Never record plan_approval until you explained the plan and they agreed. Vary phrasing; stay concise.]]
 
 guide = Agent {
     name = "guide",
@@ -393,6 +398,9 @@ Procedure {
             if text == "" or text == "None" or string.find(text, "UsageStats", 1, true) then
                 text = "(Assistant produced no user-visible text; check tool args.)"
             end
+            -- For HITL simulation, the next Human.input() message should include the
+            -- assistant's actual user-facing content (not just a "›:" prompt).
+            state._last_assistant_text = text
             state._assistant_transcript = (state._assistant_transcript or "")
                 .. "\n[TURN]" .. tostring(call_label) .. "\n" .. tostring(text) .. "\n"
             if optional_user_echo ~= nil then
@@ -452,8 +460,16 @@ Procedure {
                 end
                 user_msg = table.remove(reply_queue, 1)
             else
+                local hitl_prompt = ""
+                if state._last_assistant_text ~= nil and tostring(state._last_assistant_text) ~= "" then
+                    hitl_prompt = "[Assistant]\n"
+                        .. tostring(state._last_assistant_text)
+                        .. "\n\n[User]\n"
+                else
+                    hitl_prompt = "[User]\n"
+                end
                 user_msg = Human.input({
-                    prompt = "›: ",
+                    message = hitl_prompt,
                 })
             end
 

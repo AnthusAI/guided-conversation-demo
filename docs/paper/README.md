@@ -1,4 +1,4 @@
-# Support flow experiment writeup (LaTeX)
+# Elicitation-style support experiment writeup (LaTeX)
 
 Research-style draft in [`main.tex`](main.tex). GraphViz sources live in [`diagrams/*.dot`](diagrams/); compiled PDFs are written to **`diagrams/out/`** (ignored by git).
 

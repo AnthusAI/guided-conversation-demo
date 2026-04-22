@@ -1,15 +1,15 @@
-// Static vs dynamic system prompt for the guide agent (A/B).
+// Guided vs unguided elicitation-style checkpoints (A/B).
 digraph prompt_assembly {
   rankdir=TB;
   node [shape=box, style=rounded];
   edge [fontsize=10];
 
-  Base [label="BASE_SYSTEM_PROMPT\n(shared checklist)"];
-  Static [label="Static arm\nsystem = BASE only"];
-  Dyn [label="Dynamic arm\nsystem = BASE +\nephemeral suffix"];
-  Suf [label="orchestrator_suffix\n(Next suggested action,\nflags, still-to-collect)"];
+  Flow [label="Support intake flow\n(same requirements)"];
+  Ung [label="Unguided arm\nLLM chooses when/how\nto capture fields"];
+  Gd [label="Guided arm\nprocedure triggers\nform checkpoints"];
+  Form [label="elicitation_form\n(authoritative capture\n+ validation)"];
 
-  Base -> Static;
-  Base -> Dyn;
-  Suf -> Dyn [label="append per turn"];
+  Flow -> Ung;
+  Flow -> Gd;
+  Form -> Gd [label="checkpoint for\nbranch-critical fields"];
 }

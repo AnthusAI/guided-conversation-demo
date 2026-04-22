@@ -14,3 +14,4 @@ build/
 tests/results_*.json
 tests/reliability_comparison_summary.json
 tests/support_reliability_comparison_summary.json
+tests/support_elicitation_reliability_comparison_summary.json

@@ -30,8 +30,6 @@ docs = [
 asyncio_mode = "auto"
 markers = [
   "integration: real LLM calls (requires OPENAI_API_KEY)",
-  "reliability: complex form reliability experiment (expensive)",
-  "support_reliability: support flow reliability experiment (expensive)",
   "support_elicitation_reliability: elicitation-style support flow experiment (expensive)",
 ]
 testpaths = ["tests"]
