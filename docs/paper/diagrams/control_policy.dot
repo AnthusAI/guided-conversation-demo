@@ -1,0 +1,99 @@
+// Figure 1: Control-policy comparison.
+//
+// Shared substrate (task, validators, simulator, model) sits at the top.
+// Two control policies sit below it: unguided (LLM owns capture timing)
+// and guided (procedure owns capture timing via elicitation checkpoints).
+//
+// The point of the figure is to show that the *only* moving part between
+// arms is "who decides when to capture".
+
+digraph control_policy {
+  rankdir=TB;
+  graph [
+    fontname="Helvetica",
+    fontsize=11,
+    nodesep=0.35,
+    ranksep=0.55,
+    splines=ortho,
+    pad="0.2",
+  ];
+  node [
+    fontname="Helvetica",
+    fontsize=11,
+    shape=box,
+    style="rounded,filled",
+    color="#999999",
+    fillcolor="#FFFFFF",
+    margin="0.18,0.10",
+  ];
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#666666",
+    arrowsize=0.7,
+  ];
+
+  // ---- Shared substrate ----
+  subgraph cluster_shared {
+    label = "Shared across both arms";
+    fontsize = 11;
+    style    = "rounded,dashed";
+    color    = "#999999";
+    bgcolor  = "#F4F4F4";
+
+    task   [label="Task & branching rules\n(disclosure → category → core fields →\nbranch fields → plan + approval → done)", fillcolor="#EAF1FB"];
+    valid  [label="Validators\n(field formats, ordering,\nbranch obligations)", fillcolor="#EAF1FB"];
+    sim    [label="Simulated user\n(persona + private GT)", fillcolor="#EAF1FB"];
+    model  [label="Model\n(gpt-5.4-mini, both roles)", fillcolor="#EAF1FB"];
+
+    {rank=same; task; valid; sim; model;}
+  }
+
+  // ---- Unguided arm ----
+  subgraph cluster_unguided {
+    label    = "Unguided control policy";
+    labelloc = "t";
+    fontsize = 12;
+    style    = "rounded,filled";
+    fillcolor= "#FFF2EC";
+    color    = "#D17A4A";
+    margin   = 14;
+
+    u_loop [label="LLM agent\nchooses on every turn:\nrecord_field / record_compliance /\nchat_only / done", fillcolor="#FFFFFF", color="#D17A4A"];
+    u_state [label="Procedure state\n(read by validators only)", fillcolor="#FFFFFF", color="#D17A4A"];
+    u_done [label="done() iff LLM judges\nworkflow complete", fillcolor="#FFFFFF", color="#D17A4A"];
+
+    u_loop -> u_state [label=" inline tool call\n (LLM-chosen timing)"];
+    u_loop -> u_done  [label=" judgment call",  style=dashed];
+  }
+
+  // ---- Guided arm ----
+  subgraph cluster_guided {
+    label    = "Guided control policy";
+    labelloc = "t";
+    fontsize = 12;
+    style    = "rounded,filled";
+    fillcolor= "#ECF6EE";
+    color    = "#3F8A4A";
+    margin   = 14;
+
+    g_proc  [label="Procedure\ntracks workflow position\n+ branch obligations", fillcolor="#FFFFFF", color="#3F8A4A"];
+    g_check [label="elicitation_form checkpoint\n(only path to set\nbranch-critical fields)", fillcolor="#FFFFFF", color="#3F8A4A"];
+    g_chat  [label="LLM agent\nhandles natural-language turns\n(greeting, disclosure prose,\nplan explanation)", fillcolor="#FFFFFF", color="#3F8A4A"];
+    g_done  [label="done() iff procedure\nrules say complete", fillcolor="#FFFFFF", color="#3F8A4A"];
+
+    g_proc -> g_check [label=" procedure-chosen timing"];
+    g_proc -> g_chat  [label=" delegate prose"];
+    g_check -> g_proc [label=" validated value"];
+    g_chat  -> g_proc [label=" turn output", style=dashed];
+    g_proc  -> g_done [label=" deterministic"];
+  }
+
+  // ---- Substrate to arms (compact) ----
+  task  -> u_loop  [style=dotted, arrowhead=none, color="#999999"];
+  task  -> g_proc  [style=dotted, arrowhead=none, color="#999999"];
+  valid -> u_state [style=dotted, arrowhead=none, color="#999999"];
+  valid -> g_check [style=dotted, arrowhead=none, color="#999999"];
+  sim   -> u_loop  [style=dotted, arrowhead=none, color="#999999"];
+  sim   -> g_check [style=dotted, arrowhead=none, color="#999999"];
+}

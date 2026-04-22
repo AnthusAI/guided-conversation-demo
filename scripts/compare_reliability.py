@@ -143,7 +143,8 @@ def _print_table(
             o = r["variants"][other].get(key)
             if isinstance(b, float) and isinstance(o, float):
                 delta = o - b
-                print(f"{r['persona']:<22} {delta:+.1%:>18}")
+                delta_text = f"{delta:+.1%}"
+                print(f"{r['persona']:<22} {delta_text:>18}")
             else:
                 print(f"{r['persona']:<22} {'n/a':>18}")
         print()

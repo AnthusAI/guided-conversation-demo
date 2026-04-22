@@ -1,0 +1,67 @@
+// Figure 3: Outcome classification pipeline.
+//
+// Each rollout is sorted into one of four mutually exclusive outcome
+// classes; the metrics reported in the paper are aggregations over those
+// classes. The figure makes both the partitioning and the aggregations
+// explicit so that readers can map any single number in the results
+// section back to a count of rollouts.
+
+digraph outcomes {
+  rankdir=LR;
+  graph [
+    fontname="Helvetica",
+    fontsize=11,
+    nodesep=0.30,
+    ranksep=0.55,
+    pad="0.2",
+  ];
+  node [
+    fontname="Helvetica",
+    fontsize=11,
+    style="rounded,filled",
+    margin="0.18,0.10",
+  ];
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#666666",
+    arrowsize=0.7,
+  ];
+
+  // ---- Pipeline ----
+  run     [shape=box,    label="Rollout terminates",    fillcolor="#EAF1FB", color="#3B6FB6"];
+  d_infra [shape=diamond,label="execute() / API\nsucceeded?", fillcolor="#FFFFFF", color="#999999"];
+  d_done  [shape=diamond,label="reached done()\nlegitimately?",fillcolor="#FFFFFF", color="#999999"];
+  d_strict[shape=diamond,label="all GT fields\nmatch exactly?",fillcolor="#FFFFFF", color="#999999"];
+
+  o_infra [shape=box, label="infra_error",            fillcolor="#FFE2E2", color="#B44A4A"];
+  o_inc   [shape=box, label="incomplete",             fillcolor="#FFF2EC", color="#D17A4A"];
+  o_csf   [shape=box, label="completed_strict_fail",  fillcolor="#FFF7D6", color="#B89B3A"];
+  o_ok    [shape=box, label="strict_ok",              fillcolor="#ECF6EE", color="#3F8A4A"];
+
+  run     -> d_infra;
+  d_infra -> o_infra  [label=" no"];
+  d_infra -> d_done   [label=" yes"];
+  d_done  -> o_inc    [label=" no"];
+  d_done  -> d_strict [label=" yes"];
+  d_strict-> o_csf    [label=" no"];
+  d_strict-> o_ok     [label=" yes"];
+
+  // ---- Metric aggregations ----
+  m_strict [shape=box, style="rounded,filled,dashed", color="#3F8A4A",
+            fillcolor="#F4FBF5",
+            label="Strict success (ex-infra)\n= |strict_ok| / (N - |infra_error|)"];
+  m_compl  [shape=box, style="rounded,filled,dashed", color="#B89B3A",
+            fillcolor="#FFFCEE",
+            label="Completion\n= (|strict_ok| + |completed_strict_fail|) / N"];
+  m_infra  [shape=box, style="rounded,filled,dashed", color="#B44A4A",
+            fillcolor="#FFF4F4",
+            label="Infra failure rate\n= |infra_error| / N"];
+
+  o_ok    -> m_strict [style=dotted, arrowhead=none, color="#3F8A4A"];
+  o_ok    -> m_compl  [style=dotted, arrowhead=none, color="#B89B3A"];
+  o_csf   -> m_compl  [style=dotted, arrowhead=none, color="#B89B3A"];
+  o_infra -> m_infra  [style=dotted, arrowhead=none, color="#B44A4A"];
+
+  {rank=same; m_strict; m_compl; m_infra;}
+}
