@@ -1,0 +1,48 @@
+// Vignette 1: a compiled-in static checklist behind the elicitation tool.
+//
+// The tool's procedure holds a hand-coded list of fields with their order,
+// validators, and per-field elicitation messages. Each tool call inspects
+// procedure state, picks the next required field, and returns its
+// elicitation payload. No model is involved in producing the guidance.
+
+digraph tool_internals_script {
+  rankdir=LR;
+  graph [
+    fontname="Helvetica",
+    fontsize=11,
+    nodesep=0.30,
+    ranksep=0.45,
+    splines=ortho,
+    pad="0.15",
+  ];
+  node [
+    fontname="Helvetica",
+    fontsize=11,
+    shape=box,
+    style="rounded,filled",
+    color="#3F8A4A",
+    fillcolor="#FFFFFF",
+    margin="0.18,0.10",
+  ];
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#666666",
+    arrowsize=0.7,
+  ];
+
+  agent  [label="LLM agent\n(single role)", fillcolor="#ECF6EE"];
+  tool   [label="collect_field(name [, value])"];
+  state  [label="Procedure state\n(which fields are\nstill required, in order)"];
+  list   [label="Compiled-in checklist\n(hand-coded list of fields,\nvalidators, elicitation messages)", fillcolor="#F4FBE8"];
+  valid  [label="Per-field validator\n(format, length,\nordering, branch)"];
+
+  agent  -> tool   [label=" call"];
+  tool   -> state  [label=" read"];
+  tool   -> list   [label=" lookup"];
+  tool   -> valid  [label=" run"];
+  list   -> tool   [label=" elicitation\n message + schema", style=dashed];
+  valid  -> tool   [label=" pass / fail", style=dashed];
+  tool   -> agent  [label=" elicit / accepted /\n blocked payload",
+                    style=dashed, color="#3F8A4A"];
+}

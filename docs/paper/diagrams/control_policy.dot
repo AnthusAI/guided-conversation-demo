@@ -1,11 +1,13 @@
 // Figure 1: Control-policy comparison.
 //
 // Shared substrate (task, validators, simulator, model) sits at the top.
-// Two control policies sit below it: unguided (LLM owns capture timing)
-// and guided (procedure owns capture timing via elicitation checkpoints).
+// Two control policies sit below it: unguided (one large upfront prompt + a
+// generic record_field tool, LLM steers from its own checklist) and guided
+// (lean upfront prompt + a single collect_field tool that returns MCP-style
+// elicitation payloads at the moment the procedure has the next step).
 //
-// The point of the figure is to show that the *only* moving part between
-// arms is "who decides when to capture".
+// The LLM is in the user-facing conversational loop in BOTH arms; the
+// difference is the shape of the in-context guidance it receives.
 
 digraph control_policy {
   rankdir=TB;
@@ -59,11 +61,14 @@ digraph control_policy {
     color    = "#D17A4A";
     margin   = 14;
 
-    u_loop [label="LLM agent\nchooses on every turn:\nrecord_field / record_compliance /\nchat_only / done", fillcolor="#FFFFFF", color="#D17A4A"];
-    u_state [label="Procedure state\n(read by validators only)", fillcolor="#FFFFFF", color="#D17A4A"];
+    u_prompt [label="Long upfront system prompt\n(checklist: ordering, branch,\ncompletion, all fields)", fillcolor="#FFFFFF", color="#D17A4A"];
+    u_loop [label="LLM agent\nrelies on its own checklist;\nchooses on every turn:\nrecord_field / record_compliance /\nchat_only / done", fillcolor="#FFFFFF", color="#D17A4A"];
+    u_state [label="Procedure state\n(validators only;\nno per-step guidance back)", fillcolor="#FFFFFF", color="#D17A4A"];
     u_done [label="done() iff LLM judges\nworkflow complete", fillcolor="#FFFFFF", color="#D17A4A"];
 
+    u_prompt -> u_loop [label=" persistent system prompt"];
     u_loop -> u_state [label=" inline tool call\n (LLM-chosen timing)"];
+    u_state -> u_loop [label=" pass/fail only", style=dashed, color="#666666"];
     u_loop -> u_done  [label=" judgment call",  style=dashed];
   }
 
@@ -77,23 +82,26 @@ digraph control_policy {
     color    = "#3F8A4A";
     margin   = 14;
 
+    g_prompt [label="Lean upfront system prompt\n(tool surface + how to read\ncollect_field's return shape)", fillcolor="#FFFFFF", color="#3F8A4A"];
     g_proc  [label="Procedure\ntracks workflow position\n+ branch obligations", fillcolor="#FFFFFF", color="#3F8A4A"];
-    g_check [label="elicitation_form checkpoint\n(only path to set\nbranch-critical fields)", fillcolor="#FFFFFF", color="#3F8A4A"];
-    g_chat  [label="LLM agent\nhandles natural-language turns\n(greeting, disclosure prose,\nplan explanation)", fillcolor="#FFFFFF", color="#3F8A4A"];
-    g_done  [label="done() iff procedure\nrules say complete", fillcolor="#FFFFFF", color="#3F8A4A"];
+    g_chat  [label="LLM agent\ndrives the user-facing turn;\ncalls collect_field /\nrecord_compliance /\nchat_only / done", fillcolor="#FFFFFF", color="#3F8A4A"];
+    g_check [label="collect_field tool\nreturns MCP-style elicitation\npayload (message + schema)\nor accepted / blocked record", fillcolor="#FFFFFF", color="#3F8A4A"];
+    g_done  [label="done() gated by procedure\n(rejects early calls)", fillcolor="#FFFFFF", color="#3F8A4A"];
 
-    g_proc -> g_check [label=" procedure-chosen timing"];
-    g_proc -> g_chat  [label=" delegate prose"];
-    g_check -> g_proc [label=" validated value"];
-    g_chat  -> g_proc [label=" turn output", style=dashed];
-    g_proc  -> g_done [label=" deterministic"];
+    g_prompt -> g_chat  [label=" persistent system prompt"];
+    g_proc  -> g_chat   [label=" SYSTEM hint per turn:\n next required field"];
+    g_chat  -> g_check  [label=" collect_field(name [, value])"];
+    g_check -> g_proc   [label=" validate, store"];
+    g_check -> g_chat   [label=" elicit / accepted / blocked\n payload (in-context)", style=dashed];
+    g_chat  -> g_done   [label=" call done()"];
+    g_proc  -> g_done   [label=" gate"];
   }
 
   // ---- Substrate to arms (compact) ----
-  task  -> u_loop  [style=dotted, arrowhead=none, color="#999999"];
-  task  -> g_proc  [style=dotted, arrowhead=none, color="#999999"];
-  valid -> u_state [style=dotted, arrowhead=none, color="#999999"];
-  valid -> g_check [style=dotted, arrowhead=none, color="#999999"];
-  sim   -> u_loop  [style=dotted, arrowhead=none, color="#999999"];
-  sim   -> g_check [style=dotted, arrowhead=none, color="#999999"];
+  task  -> u_prompt [style=dotted, arrowhead=none, color="#999999"];
+  task  -> g_proc   [style=dotted, arrowhead=none, color="#999999"];
+  valid -> u_state  [style=dotted, arrowhead=none, color="#999999"];
+  valid -> g_check  [style=dotted, arrowhead=none, color="#999999"];
+  sim   -> u_loop   [style=dotted, arrowhead=none, color="#999999"];
+  sim   -> g_chat   [style=dotted, arrowhead=none, color="#999999"];
 }

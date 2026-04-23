@@ -1,6 +1,6 @@
-# Elicitation-style support experiment writeup (LaTeX)
+# Dynamic in-context guidance for guided conversations — paper draft
 
-Research-style draft in [`main.tex`](main.tex). GraphViz sources live in [`diagrams/*.dot`](diagrams/); compiled PDFs are written to **`diagrams/out/`** (ignored by git).
+Research-style draft in [`main.tex`](main.tex). It develops a broader argument for tool-authored, just-in-time guidance as an alternative to long upfront prompts and multi-system-prompt-selection patterns, and reports two controlled studies on a constrained support-intake benchmark (experiment one: form-filling layer; experiment two: orchestration layer). GraphViz sources live in [`diagrams/*.dot`](diagrams/); compiled PDFs are written to **`diagrams/out/`** (ignored by git). Inline `[TODO: …]` markers in the rendered PDF flag cells that will be filled in once the in-flight pilots complete.
 
 ## Prerequisites
 

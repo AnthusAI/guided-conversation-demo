@@ -31,5 +31,6 @@ asyncio_mode = "auto"
 markers = [
   "integration: real LLM calls (requires OPENAI_API_KEY)",
   "support_elicitation_reliability: elicitation-style support flow experiment (expensive)",
+  "support_orchestrated_reliability: orchestrator-mediated support flow experiment under impatient users (expensive)",
 ]
 testpaths = ["tests"]

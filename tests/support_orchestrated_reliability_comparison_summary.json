@@ -1,0 +1,188 @@
+{
+  "experiment": "support_orchestrated",
+  "description": "Support flow (orchestrated, impatient client) \u2014 upfront vs rigid vs loose \u2014 summary (strict ex-infra, completion, hung-up, engagement-aware completion, infra; impatient client)",
+  "run_tag": "exp2_pilot10",
+  "results_suffix": null,
+  "baseline_variant": "support_orchestrated_upfront",
+  "variants": [
+    "support_orchestrated_upfront",
+    "support_orchestrated_rigid",
+    "support_orchestrated_loose"
+  ],
+  "client_modes": [
+    "impatient"
+  ],
+  "rows": [
+    {
+      "persona": "support_rambler",
+      "baseline": "support_orchestrated_upfront",
+      "variants": {
+        "support_orchestrated_upfront": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.5,
+            "strict_ex_infra": 0.5,
+            "completion_rate": 0.6,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 10,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_rigid": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.6,
+            "strict_ex_infra": 0.6,
+            "completion_rate": 1.0,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 6,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_loose": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.9,
+            "strict_ex_infra": 0.9,
+            "completion_rate": 0.9,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.1,
+            "engagement_aware_completion_rate": 0.9,
+            "hung_up_runs": 1,
+            "engagement_aware_engaged_runs": 10,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        }
+      }
+    },
+    {
+      "persona": "support_billing",
+      "baseline": "support_orchestrated_upfront",
+      "variants": {
+        "support_orchestrated_upfront": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.5,
+            "strict_ex_infra": 0.5,
+            "completion_rate": 0.5,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 9,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_rigid": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.9,
+            "strict_ex_infra": 0.9,
+            "completion_rate": 0.9,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.1,
+            "engagement_aware_completion_rate": 0.9,
+            "hung_up_runs": 1,
+            "engagement_aware_engaged_runs": 9,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_loose": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 1.0,
+            "strict_ex_infra": 1.0,
+            "completion_rate": 1.0,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 10,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        }
+      }
+    },
+    {
+      "persona": "support_technical",
+      "baseline": "support_orchestrated_upfront",
+      "variants": {
+        "support_orchestrated_upfront": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.3,
+            "strict_ex_infra": 0.3,
+            "completion_rate": 0.3,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 10,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_rigid": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.6,
+            "strict_ex_infra": 0.6,
+            "completion_rate": 1.0,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 6,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_loose": {
+          "impatient": {
+            "runs": 10,
+            "strict_all": 0.7,
+            "strict_ex_infra": 0.7,
+            "completion_rate": 1.0,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 10,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        }
+      }
+    }
+  ]
+}
