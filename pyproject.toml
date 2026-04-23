@@ -32,5 +32,6 @@ markers = [
   "integration: real LLM calls (requires OPENAI_API_KEY)",
   "support_elicitation_reliability: elicitation-style support flow experiment (expensive)",
   "support_orchestrated_reliability: orchestrator-mediated support flow experiment under impatient users (expensive)",
+  "support_scripted_baseline_reliability: deterministic scripted baseline arm C (no LLM in agent path; expensive on non_ideal)",
 ]
 testpaths = ["tests"]
