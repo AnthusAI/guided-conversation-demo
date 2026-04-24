@@ -37,18 +37,7 @@ _BOOLEAN_FIELDS: tuple[str, ...] = (
     "compliance_fee_done",
 )
 
-_CLIENT_MODES: tuple[str, ...] = ("ideal", "non_ideal", "impatient", "trichotomy")
-
-# ---------------------------------------------------------------------------
-# Trichotomy client mode (Appendix E.5 / Layer 5).
-#
-# Emits MCP-style ``decline`` / ``cancel`` sentinel replies at elicitation
-# prompts for fields listed in ``persona["trichotomy_actions"]``. The guided
-# trichotomy arm (``support_flow_elicitation_guided_trichotomy.tac``) keys off
-# these sentinels and branches accordingly.
-# ---------------------------------------------------------------------------
-DECLINE_SENTINEL: str = "[ELICITATION · DECLINE]"
-CANCEL_SENTINEL: str = "[ELICITATION · CANCEL]"
+_CLIENT_MODES: tuple[str, ...] = ("ideal", "non_ideal", "impatient")
 
 # ---------------------------------------------------------------------------
 # Impatient client mode (used by experiment two).
@@ -288,7 +277,6 @@ class LLMHITLHandler:
         client_mode: str = "ideal",
         preferred_topic: Optional[dict] = None,
         patience_budget: int = PATIENCE_BUDGET_DEFAULT,
-        trichotomy_actions: Optional[dict] = None,
     ):
         if client_mode not in _CLIENT_MODES:
             raise ValueError(
@@ -305,8 +293,6 @@ class LLMHITLHandler:
         # Per-handler counter of how many times each field has been requested
         # in this run, so the wrong-then-correct branch can transition to clean.
         self._elicit_calls: dict[str, int] = {}
-        # Trichotomy-mode per-field overrides.
-        self.trichotomy_actions = dict(trichotomy_actions or {})
 
         # Impatient-mode bookkeeping. preferred_topic may be None for personas
         # without a topic block; in that case the patience tracker is inert.
@@ -459,38 +445,14 @@ class LLMHITLHandler:
                     "billing_charge_acknowledged",
                 ):
                     value = "yes"
-                # Nested-elicitation arm asks for a 4-digit verification_code that
-                # is synthetic — not part of any persona's ground truth. The
-                # simulator supplies a canned code that matches the arm's pattern.
-                if value is None and field == "verification_code":
-                    value = "1234"
                 ask_index = self._elicit_calls.get(field, 0)
                 self._elicit_calls[field] = ask_index + 1
-
-                if (
-                    self.client_mode == "trichotomy"
-                    and field in self.trichotomy_actions
-                ):
-                    action = self.trichotomy_actions.get(field, "accept")
-                    if action == "decline":
-                        return HITLResponse(
-                            value=DECLINE_SENTINEL,
-                            responded_at=datetime.now(timezone.utc),
-                            timed_out=False,
-                        )
-                    if action == "cancel":
-                        return HITLResponse(
-                            value=CANCEL_SENTINEL,
-                            responded_at=datetime.now(timezone.utc),
-                            timed_out=False,
-                        )
-                    # "accept" falls through to the ground-truth reply below.
 
                 if self.client_mode == "non_ideal":
                     reply = self._non_ideal_response(field, value, ask_index)
                 else:
-                    # ``ideal``, ``impatient``, and ``trichotomy`` (accept path)
-                    # use the clean ground-truth value at the elicitation form.
+                    # Both ``ideal`` and ``impatient`` use the clean
+                    # ground-truth value once they reach the elicitation form.
                     reply = str(value) if value is not None else ""
 
                 return HITLResponse(
