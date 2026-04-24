@@ -32,5 +32,11 @@ markers = [
   "integration: real LLM calls (requires OPENAI_API_KEY)",
   "support_elicitation_reliability: elicitation-style support flow experiment (expensive)",
   "support_orchestrated_reliability: orchestrator-mediated support flow experiment under impatient users (expensive)",
+  "support_scripted_baseline_reliability: deterministic scripted baseline arm C (no LLM in agent path; expensive on non_ideal)",
+  "support_unguided_auto_reliability: Layer 3 (choice-level) ablation — unguided baseline with tool_choice=auto (expensive)",
+  "support_guided_strict_reliability: Layer 2 (decoder-level) reference — guided arm with explicit strict JSON Schema (expensive)",
+  "support_guided_trichotomy_reliability: Layer 5 (protocol-level) reference — guided arm with MCP accept/decline/cancel trichotomy (expensive)",
+  "support_nested_reliability: Appendix D nested-elicitation reference implementation (expensive)",
+  "support_durable_resume: Layer 4 (durable-execution) reference test — crash-and-resume (offline, no LLM)",
 ]
 testpaths = ["tests"]

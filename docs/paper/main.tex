@@ -85,7 +85,7 @@
 \title{Dynamic In-Context Guidance for Guided Conversations\\
 Tool-Authored Elicitations as a Reliability Lever\\
 \large Two Controlled Studies on a Constrained Support-Intake Benchmark}
-\author{Ryan Porter}
+\author{Ryan Porter \and Matthew Belchak}
 \date{\today}
 
 \newcommand{\rerunPlaceholderN}{100}
@@ -940,6 +940,18 @@ Failed unguided runs in experiment one approach the per-run turn cap, which mean
 \paragraph{Efficiency interpretation.}
 Each guided rollout in experiment one is necessarily at least one user-facing turn per required field, plus the disclosure turns and the final approval. The guided arm's turn counts therefore approximate the ``physical'' minimum for the workflow rather than reflecting any compression. The unguided arm's failed runs, by contrast, approach the per-run turn cap, which is a sign of exploratory loops rather than productive work. Treat the turn-count gap as evidence about \emph{shape} (the guided arm avoids long recovery tails) rather than as a UX latency claim. Experiment two's orchestrator arms are bounded similarly from below; the more interesting per-arm efficiency statistic there is hang-up rate rather than turn count.
 
+\paragraph{Enforcement layers exercised vs.\ omitted.}
+A separable way to read the experiments is along the axis of \emph{how} the tool contract is enforced, not where it lives. Both arms share forced tool calling (\texttt{tool\_choice=\allowbreak required}) at the API layer, which guarantees that some tool is called each turn but does not enforce the \emph{shape} of the arguments at the decoder level. The guided arm's \texttt{requestedSchema} is informational: the model's \texttt{collect\_field} argument is validated post-hoc by Python code, not constrained at generation time. The chat-message history is monotonic rather than durable: there is no exactly-once resume across process death. The tool return vocabulary (\texttt{accepted}/\texttt{elicit}/\texttt{blocked}) is a plain success/error partition rather than the typed \texttt{accept}/\texttt{decline}/\texttt{cancel} trichotomy defined by the MCP elicitation spec. Appendix~\ref{app:enforcement-layers} develops this framing and maps the paper onto five independent enforcement layers. Some portion of the reported gains is consistent with the paper's architectural claim; some portion may be attributable to layers the upfront baseline happens not to exercise. A clean isolation requires ablations we do not run here.
+
+\paragraph{Deterministic floor.}
+Because both arms keep the LLM in the agent path on every turn, the experiments cannot distinguish gains attributable to the architecture from gains attributable to the workflow's intrinsic structure --- whether, for example, a non-LLM scripted form-filler is already sufficient on the \emph{ideal} simulator. Appendix~\ref{app:scripted} specifies a deterministic baseline arm (Arm C) that removes the LLM entirely from the agent path while keeping the simulator, personas, validators, and turn cap identical; reference code is shipped alongside this repository. Running it and reporting its \emph{ideal} and \emph{non\_ideal} cells alongside the paper's headline table is the cleanest available construct-validity check on the size of the architectural contribution.
+
+\paragraph{Workflow fragmentation in the guided arm.}
+The guided arm's pre-request \texttt{SYSTEM:} hint is a per-turn condensed summary of the still-needed fields and the next-required field. The workflow is therefore not fully removed from the LLM's context; it is fragmented across turns and re-presented each request. Whether the load-bearing mechanism is the tool-layer authorship of typed elicitations, the per-turn hint itself, or the interaction of both is a confound in the present design. Appendix~\ref{app:hooks-elicitations} frames the two factors as orthogonal (a hook position and a payload shape) and names three ablations that would cleanly separate them. We did not run those ablations for this paper and flag them as the most direct follow-on.
+
+\paragraph{Same-model engagement classification (experiment two).}
+The \emph{impatient} simulator's deflection-detection heuristic is evaluated by a model in the same family as the agent under test. This creates a correlation between ``what the agent is likely to say'' and ``what the deflection classifier is likely to call engaged'' that we cannot cleanly remove within the current harness. A more independent signal --- a non-LLM keyword heuristic (which the current implementation approximates but then augments with a same-family judge), a different model family, or a human-in-the-loop spot-check over a sampled subset of runs --- would bound the size of this effect. We report this as a threat to Experiment 2's comparison between rigid and loose, not as an invalidation.
+
 % =============================================================================
 \section{Open design space and future work}
 \label{sec:open-design-space}
@@ -961,6 +973,18 @@ A direct extension is to repeat both experiments on additional workflows---claim
 \paragraph{Composition with traditional fine-tuning and RL.}
 A separable axis from the architectural one is whether the LLM is fine-tuned on the workflow. The architectural argument here is orthogonal to model training: a fine-tuned model in an upfront-prompt architecture still has the same workflow-bookkeeping load as a non-fine-tuned model, and a non-fine-tuned model in a tool-authored just-in-time architecture still has the workflow's checklist offloaded into program logic. Comparing the four cells of $\{\text{fine-tuned},\,\text{not}\}\times\{\text{upfront},\,\text{tool-authored}\}$ is a natural follow-up.
 
+\paragraph{Strict-mode / constrained-decoding ablation.}
+The guided arm's \texttt{requestedSchema} is present but never reaches the LLM's decoder; schema validation happens post-hoc in Python. Re-running Experiment 1 with provider-native strict JSON Schema enforcement (for example OpenAI \texttt{strict: true}, Anthropic strict-mode tools) on the \texttt{value} argument of \texttt{collect\_field} would prevent the model from emitting arguments that violate the schema at generation time. The prediction is a reduction in non\_ideal retry loops (shape-level failures become impossible; only semantic failures remain). We ship a reference implementation at the tool-handler level (closed JSON Schemas with \texttt{additionalProperties=false}, strict pre-check before the user-facing validator, explicit \texttt{strict=true} marker in every elicitation payload) as Arm \emph{guided\_strict}; see Appendix~\ref{app:per-layer-refs}, §~\ref{app:layer2-strict}. The Tactus-level passthrough that would reach the decoder itself is a framework-side extension we flag in that appendix. If the non\_ideal gap narrows materially under strict mode without any other architectural change, decoder-level enforcement is doing more of the reliability work than the current design credits it with. Appendix~\ref{app:enforcement-layers} discusses this as one of five independent enforcement layers; this arm isolates layer~2 from layer~1.
+
+\paragraph{Protocol-trichotomy adoption.}
+\texttt{collect\_field} currently returns a two-way partition (\texttt{accepted} / \texttt{elicit}; with a \texttt{blocked} guard). The MCP elicitation spec defines a three-way trichotomy --- \texttt{accept}, \texttt{decline}, \texttt{cancel} --- with distinct semantics: deliberate refusal versus absence of engagement. We ship a reference implementation (Arm \emph{guided\_trichotomy}) that extends the simulator with a \texttt{trichotomy} client mode emitting \texttt{[ELICITATION \textperiodcentered\ DECLINE]} and \texttt{[ELICITATION \textperiodcentered\ CANCEL]} sentinels for persona-specified fields, and extends \texttt{collect\_field} to branch on all three terminal states: \texttt{accept} stores, \texttt{decline} records a skipped optional field (and re-elicits mandatory fields), \texttt{cancel} exits the flow cleanly with \texttt{completed=false, cancelled=true}. See Appendix~\ref{app:per-layer-refs}, §~\ref{app:layer5-trichotomy}. In Experiment 2 this interacts non-trivially with the impatient simulator's deflection-detection heuristic: today a hang-up is modeled as a terminal infra event; under the trichotomy it is one kind of \texttt{cancel}.
+
+\paragraph{Nested elicitation protocol.}
+Experiment 2's orchestrator arms use a two-level structure (\texttt{run\_phase} drives the phase; \texttt{collect\_field} collects one field), but the two levels are asymmetric: \texttt{run\_phase} returns a custom instruction payload rather than an MCP elicitation, and the outer directive disappears from the LLM's context once the inner elicitation is active. Appendix~\ref{app:nested} sketches a protocol in which the outer and inner levels are both MCP elicitations, a call stack of frames is simultaneously visible to the LLM, and each frame carries explicit depth and parent-pointer context. We ship a reference implementation (Arm \emph{nested}) in which an \texttt{account\_email} elicitation pushes a \texttt{verify\_identity} sub-frame, every tool return carries a visible \texttt{frame\_stack} with per-frame depth and parent pointers, and the outer frame only resolves once the inner one closes; see Appendix~\ref{app:per-layer-refs}, §~\ref{app:nested-ref}. A controlled comparison against a flat variant (in which the LLM manages verification at the top level with no visible connection to email collection) is the natural follow-up study; the reference implementation is the starting point.
+
+\paragraph{Durable execution as a substrate.}
+Both experiments treat the chat history as the ground truth. A mid-turn process crash loses the run. Tactus already implements a checkpoint-and-replay execution model (event-history replay, \texttt{WAITING\_FOR\_HUMAN} suspend states, deterministic resume against persisted execution logs); wrapping turn boundaries in this substrate would not change the reported headline numbers but would change the experiments' production-deployability. We ship a reference integration test (\texttt{tests/test\_durable\_resume.py}) that runs the scripted baseline to a mid-flow crash injected from the HITL handler, then resumes against the same \texttt{procedure\_id} and \texttt{FileStorage} directory in a fresh runtime; the resumed run consumes cached HITL replies from the execution log and completes without re-prompting. See Appendix~\ref{app:per-layer-refs}, §~\ref{app:layer4-durable}. The four-cell design $\{\text{durable}, \text{not}\} \times \{\text{guided}, \text{upfront}\}$ under an injected-crash workload is a natural extension and would lean on the layer~4 axis of Appendix~\ref{app:enforcement-layers}.
+
 % =============================================================================
 \section{Conclusion}
 
@@ -969,5 +993,181 @@ We argued for an alternative to the two architectures that currently dominate gu
 The two experiments isolate two layers of the architecture. Experiment one isolates the form-filling layer: replacing a long upfront checklist with per-step tool-authored elicitations from a single \texttt{collect\_field} tool produces a measurable strict-success and completion gain on a constrained intake workflow with three personas and two simulator client modes ($N=\rerunPlaceholderN$ per persona per arm; full-pilot numbers in Section~\ref{sec:exp1}). The mechanism behind the gain is concrete: the LLM is no longer asked to be both the conversational policy and the workflow's checklist, and the long recovery tails that dominate the unguided baseline disappear. Experiment two isolates the orchestration layer: holding the form-filling layer constant, a rigid orchestrator that strictly enforces phase order and a loose orchestrator that defers to user preference subject to compliance prerequisites yield different trade-offs under an \emph{impatient} simulator client mode, with the loose orchestrator expected to dominate on engagement-aware completion (numbers in Section~\ref{sec:exp2}).
 
 What the two experiments share is the framing. Where procedural detail lives, and at what granularity it reaches the LLM, is a control-architecture choice with measurable reliability consequences. Putting that procedural detail into program logic that authors short, just-in-time elicitations---rather than into one large upfront prompt or several short prompts plus a router---is a competitive architecture for guided conversations, and the design space behind it is large enough to warrant deliberate study.
+
+% =============================================================================
+\appendix
+
+% =============================================================================
+\section{Hooks and elicitations as orthogonal concepts}
+\label{app:hooks-elicitations}
+
+The paper's architecture bundles two concepts that are in fact independent. Separating them sharpens the contribution and makes the design space easier to reason about.
+
+\paragraph{Definitions.}
+A \emph{hook} is a position in the runtime where code runs --- an extension point that fires at a specific event (pre-X, post-X, on-X) and may observe, modify, or block the event. A hook answers the question \emph{where and when} code intervenes. An \emph{elicitation}, in the sense inherited from the MCP spec, is a typed payload shape carrying a user-facing \texttt{message}, a \texttt{requestedSchema}, an \texttt{action} discriminant, and implementation-specific \texttt{instruction} text. An elicitation answers the question \emph{what shape} a message takes as it flows through the runtime. Hooks are plumbing; elicitations are cargo.
+
+\paragraph{The guided arm uses two hooks; only one carries an elicitation.}
+The guided procedure in Experiment 1 installs two distinct hooks. The pre-user-message hook prepends a one-line \texttt{SYSTEM:} block to each user turn with the next-required field and the still-needed list; the tool-return hook emits an MCP-style elicitation payload from \texttt{collect\_field}. The first payload is free text (``\texttt{SYSTEM: Still needed: a, b, c / Next: a}''); the second is a typed payload with a schema. One hook, one elicitation --- the fact that the two are not the same shape is the proof that hooks and elicitations are independent concepts.
+
+\paragraph{Dependency direction.}
+Hooks exist without elicitations trivially (git \texttt{pre-commit}, web-framework middleware, React \texttt{useEffect} --- all hooks; none involve MCP-shaped payloads). Elicitations, however, require some hook-like carrier: a typed payload must ride on \emph{something} that fires and delivers. Elicitations presuppose hooks; hooks don't presuppose elicitations.
+
+\paragraph{Ablations this framing unlocks.}
+Three cheap ablations follow from the separation: (1) a \emph{hook-only / plain-payload} arm that keeps both hook positions but strips the schema from \texttt{collect\_field}'s return, isolating whether typed-payload discipline is load-bearing for the observed gain; (2) a \emph{single-hook} arm that drops the \texttt{SYSTEM:} hint, isolating whether the per-turn next-field checklist is doing the work; and (3) an \emph{elicitation-shape-only} arm that drops the hint, keeps the typed tool return, and lets the LLM self-direct in between, isolating the interaction between the two hook positions. None of these were run for this paper; all are direct follow-ups.
+
+\paragraph{The five vignettes, re-sorted.}
+The five back-end mechanisms named in Section~\ref{sec:engineering} are presented as a one-dimensional spectrum; under the hook/elicitation split they are a cross-product of two axes (authorship mechanism $\times$ hook topology). Three of the six cells are tested in this paper; three are not.
+
+% =============================================================================
+\section{Hook enforcement layers: a framing of the contribution}
+\label{app:enforcement-layers}
+
+The paper's architectural intervention can be cast as operating on two of five independent enforcement layers. This appendix specifies those layers and maps the experiments onto them; it is a framing device, not a new experiment.
+
+\paragraph{The five layers.}
+\begin{enumerate}
+\item \textbf{Positional.} \emph{Where and when} a handler runs --- AOP join points, middleware hook points such as \texttt{before\_model} and \texttt{after\_tool}. Prevents the failure mode of ``the handler never runs at the right moment.''
+\item \textbf{Decoder-level.} \emph{Shape} of LLM output --- constrained decoding with a strict JSON Schema, implemented as finite-state-machine masking of invalid tokens before sampling. Prevents the failure mode of ``the model emits malformed output.''
+\item \textbf{Choice-level.} \emph{That} a tool is called (and optionally which one) --- the \texttt{tool\_choice="required"} family of API flags, enforced by prefilling the assistant turn. Prevents the failure mode of ``the model replies conversationally instead of calling a tool.''
+\item \textbf{Durable-execution.} The handler \emph{finishes exactly once} across crashes --- event-history replay as implemented by durable-workflow engines. Prevents the failure mode of ``partial execution leaves the system inconsistent.''
+\item \textbf{Protocol-level.} The \emph{response} follows typed semantics --- MCP elicitation's \texttt{accept} / \texttt{decline} / \texttt{cancel} trichotomy. Prevents the failure mode of ``the terminal state is ambiguous.''
+\end{enumerate}
+
+\paragraph{Where the paper sits.}
+The headline experiments (Experiment 1 and Experiment 2) exercise layers 1 and 3: all four headline \texttt{.tac} arms use \texttt{tool\_choice="required"}, and the guided arm adds layer 1 in a richer form (two hook positions --- pre-user-message and tool-return). The paper additionally ships per-layer reference implementations for layers 2, 4, and 5 in Appendix~\ref{app:per-layer-refs}: a strict-JSON-Schema guided arm (layer 2), a durable-resume integration test that crashes and recovers against a persistent storage backend (layer 4), and a trichotomy-aware guided arm whose simulator emits distinct decline and cancel sentinels (layer 5). A layer-3 ablation (tool\_choice="auto") and a nested-elicitation topology extension round out the appendix. The reference implementations are not full reliability studies; each is the smallest independently-shippable isolation of a single layer.
+
+\paragraph{Independence of layers.}
+Each layer catches a different class of failure, and each is independent: layer 1 without layer 3 is an observational hook that does not force tool use; layer 3 without layer 2 is a forced tool call whose arguments the model can fabricate; layer 5 without layer 4 is typed responses in a non-durable runtime; and so on. A fully enforced hook composes all five. The headline experiments' gains therefore have a ceiling imposed by the layers they do not exercise; Appendix~\ref{app:per-layer-refs} names the minimum viable isolation for each of the other three layers, and the follow-on reliability studies named in Section~\ref{sec:open-design-space} use those arms as the starting point.
+
+\paragraph{What this reframing is for.}
+It does not replace the architectural claim of the paper --- layer 1 topology is a real axis of reliability. It clarifies the \emph{scope} of that claim and names the specific confounds that would need to be controlled for a fully isolated architectural attribution. The prior-art anchors for each layer are, in order: aspect-oriented programming and web-framework middleware (layer 1); constrained decoding and strict JSON Schema as shipped by OpenAI, Anthropic, and others (layer 2); provider \texttt{tool\_choice} parameters (layer 3); durable-workflow engines such as Temporal and Inngest, and lightweight checkpointed graphs such as LangGraph (layer 4); and the MCP elicitation specification itself (layer 5).
+
+% =============================================================================
+\section{Deterministic scripted baseline (Arm C)}
+\label{app:scripted}
+
+This appendix specifies a non-LLM reference arm that runs against the same simulator, personas, validators, and turn cap as the paper's LLM arms. Its role is sensitivity analysis, not competing architecture: it quantifies how much of the headline \emph{ideal}-mode gain is attributable to the benchmark's own structure rather than to the architectural intervention.
+
+\paragraph{Rationale.}
+Both arms in Experiment 1 keep the LLM in the agent path on every turn. Neither can answer the question ``what fraction of the guided arm's strict success is achievable by a deterministic form-filler that knows the field schedule and the regex for each value?'' A scripted baseline that emits the \texttt{[ELICITATION \textperiodcentered\ FORM]} sentinel, walks the workflow in the specified order, normalizes and validates each reply with the same Python validators the guided arm uses, and respects the same 3-attempts-per-field retry budget, answers that question directly.
+
+\paragraph{Implementation.}
+The arm ships as a single Tactus procedure, \texttt{support\_flow\_scripted\_baseline.tac}, at the repository root alongside the other four \texttt{.tac} arms. Its Procedure block contains no Agent definition: the procedure walks the workflow directly, using \texttt{Human.input} at each elicitation point with a prompt that includes the \texttt{[ELICITATION \textperiodcentered\ FORM]} sentinel the simulator keys off. Validators and extractors are the same Lua functions that the Experiment~1 guided arm uses, so the only change versus that arm is the removal of the \texttt{Agent \{\}} block; the rest of the runtime substrate --- Tactus, the HITL handler, the simulator, the personas, the validators, the turn cap --- is identical. The reliability matrix runs through \texttt{tests/test\_scripted\_baseline\_reliability.py}, which reuses the same per-run executor and outcome classifier as the other arms' reliability tests.
+
+\paragraph{Expected qualitative predictions.}
+Under \emph{ideal}, the simulator short-circuits elicitation sentinels with ground-truth values: the scripted arm is expected to approach or match the guided arm's headline number, because the remaining failure surface is just the agent-side ability to ask for fields in the right order with the right gating. Under \emph{non\_ideal}, where format noise, refusals, and wrong-then-correct replies depress every cell, the scripted arm is expected to underperform both LLM arms --- it has no way to interpret noisy-but-intelligible replies. Under \emph{impatient} (Experiment 2's client mode), the scripted arm has no model of engagement with a preferred topic and is structurally unable to avoid hang-ups; this cell is not meaningful for comparison and we would omit it.
+
+\paragraph{Effect on the paper's claims.}
+If the scripted arm approaches the guided arm's \emph{ideal} cell closely, the honest contribution of the paper narrows to the \emph{non\_ideal} delta, where the LLM's ability to reinterpret noisy user input does real work. If the scripted arm substantially underperforms, the architectural claim is correspondingly strengthened even in the idealized setting. Running the arm and reporting its cells alongside the Experiment 1 headline table is the construct-validity check we flag in Section~\ref{sec:limits}; we ship the code but defer the full-pilot numbers to a follow-up.
+
+% =============================================================================
+\section{Nested elicitation protocol (specification sketch)}
+\label{app:nested}
+
+This appendix specifies an extension of the MCP elicitation pattern in which multiple elicitation frames can be simultaneously active, with explicit depth and parent-pointer context visible to the LLM. It is protocol work, not an experiment; we specify the shape and defer the controlled comparison.
+
+\paragraph{Motivation.}
+Experiment 2's orchestrated arms already have a two-level structure (\texttt{run\_phase} $\to$ \texttt{collect\_field}), but the two levels are asymmetric: the outer level returns a custom instruction payload, not an MCP elicitation, and its content disappears from the LLM's context once the inner elicitation is active. A natural extension treats both levels symmetrically (both as MCP elicitations) and keeps both frames visible simultaneously with explicit recursion context.
+
+\paragraph{Frame extension.}
+An MCP elicitation payload is augmented with four additional fields: \texttt{depth} (1-indexed integer), \texttt{frame\_id} (opaque identifier), \texttt{parent\_frame\_id} (identifier of the invoking frame, or null at depth 1), and \texttt{parent\_state} (short human-readable summary of what the parent frame is waiting for). Existing MCP clients ignore the new fields and behave as today.
+
+\paragraph{Stack visibility.}
+When the LLM is prompted, the user turn includes a rendered \texttt{[ACTIVE ELICITATION STACK]} block that lists the currently active frames from innermost to outermost, with each frame's \texttt{message}, \texttt{requestedSchema} summary, and \texttt{parent\_state}. The innermost frame's \texttt{instruction} text names the recursion explicitly: ``you are recursing into a nested elicitation; the outer frame remains active and will resume when this one returns.''
+
+\paragraph{Return semantics.}
+On successful completion of frame $N$ (\texttt{action: accept} with content matching the frame's schema), the runtime pops frame $N$ and emits a \texttt{resume} notification to the LLM carrying the child's result; the LLM's next turn operates in frame $N-1$ with the child's result available. On \texttt{decline} or \texttt{cancel} of frame $N$, the runtime emits a \texttt{resume} with the child's action but no content; the parent's handler decides whether to escalate, retry, or short-circuit.
+
+\paragraph{Fit with existing layers.}
+Using the framework of Appendix~\ref{app:enforcement-layers}: each frame's schema can be enforced by constrained decoding independently (layer 2); each frame's tool call can be forced independently (layer 3); push and pop are natural checkpoint points (layer 4); and the \texttt{accept}/\texttt{decline}/\texttt{cancel} trichotomy is inherited per frame with the added semantics that a parent can react differently to a child decline than to a child cancel (layer 5). Nested elicitation is a layer 1 \emph{topology} extension combined with layer 5 \emph{recursive} semantics; it does not replace the other layers.
+
+\paragraph{Candidate first experiment.}
+An \texttt{account\_email} collection whose handler conditionally pushes a \texttt{verify\_identity} sub-frame (``we sent a 6-digit code to user@\dots, please enter it'') when the email is unverified, compared against a flat variant that requires the LLM to manage verification at the top level with no visible connection to the email-collection context. Under the \emph{non\_ideal} simulator this experiment isolates the LLM's ability to handle a visible parent--child relationship against its ability to maintain the same relationship implicitly in its own working memory.
+
+\paragraph{Open design questions.}
+Several design decisions are deliberately left open in the sketch above. \emph{Stack visibility scope}: should the LLM always see the full active stack, only the top $k$ frames, or only the top and bottom? The trade-off is context-window cost against reasoning quality at deep recursion. \emph{Concurrent frames}: can two sibling elicitations be simultaneously active (for example, collecting two independent fields in parallel), or is the stack strictly LIFO? \emph{Timeout inheritance}: if an ancestor frame has a finite deadline and a child frame is pushed, does the child inherit the remaining budget? \emph{Partial acceptance across frames}: the \texttt{decline} action today carries no content, but a child frame may plausibly carry partial information useful to the parent; a \texttt{partial\_content} extension on \texttt{decline} is a natural generalization. \emph{Instruction-template depth}: how explicitly should the LLM be told it is recursing? Early informal experience suggests models benefit from explicit acknowledgement of depth and parent state, but this is worth a controlled measurement.
+
+\paragraph{Relationship to prior work.}
+Nested elicitation imports the semantics of algebraic effects and continuation-passing style into the MCP elicitation vocabulary without requiring the host runtime to be effect-aware. LangGraph's \texttt{interrupt()} is a one-frame suspend primitive with durable resume but does not model a visible stack of active interrupts; middleware chains are a flat approximation where the \texttt{next} function is a degenerate one-shot continuation; coroutines and effect handlers provide the closest formal analog.
+
+% =============================================================================
+\section{Per-layer reference implementations}
+\label{app:per-layer-refs}
+
+Appendix~\ref{app:enforcement-layers} named five independent enforcement layers. This appendix indexes the smallest-possible reference implementation we ship for each of the three layers the headline experiments do not exercise (2, 4, 5), plus a layer-3 ablation and the nested-elicitation topology extension from Appendix~\ref{app:nested}. Each reference is a single file (or pair of files); each isolates one mechanism; none is a full reliability study. Where a layer is already exercised by the headline experiments we say so and move on.
+
+\paragraph{Summary map.}
+\begin{itemize}
+\item \textbf{Layer 1 (positional).} Exercised by the headline experiments. The guided arm's two hook positions --- a pre-user-message \texttt{SYSTEM:} prepend and a tool-return elicitation payload --- are the layer-1 intervention the paper measures. No additional reference.
+\item \textbf{Layer 2 (decoder-level).} Arm \emph{guided\_strict}, §\ref{app:layer2-strict}.
+\item \textbf{Layer 3 (choice-level).} Exercised by every headline arm via \texttt{tool\_choice="required"}. An ablation that sets \texttt{tool\_choice="auto"} on the unguided baseline (Arm \emph{unguided\_auto}) is shipped for symmetry; §\ref{app:layer3-choice}.
+\item \textbf{Layer 4 (durable-execution).} Integration test \texttt{tests/test\_durable\_resume.py}, §\ref{app:layer4-durable}.
+\item \textbf{Layer 5 (protocol-level).} Arm \emph{guided\_trichotomy} plus a simulator extension, §\ref{app:layer5-trichotomy}.
+\item \textbf{Nested topology.} Arm \emph{nested}, §\ref{app:nested-ref}.
+\end{itemize}
+
+\subsection{Layer 3 ablation: \texttt{tool\_choice="auto"}}
+\label{app:layer3-choice}
+
+File: \texttt{support\_flow\_elicitation\_unguided\_auto.tac}. Differs from \texttt{support\_flow\_elicitation\_unguided.tac} in exactly one line (\texttt{tool\_choice = "auto"}). The LLM is free to return a plain user-facing reply without calling any tool. Reliability harness: \texttt{tests/test\_unguided\_auto\_reliability.py}, marker \texttt{support\_unguided\_auto\_reliability}. The intended use is as a direct comparison cell against the matching \texttt{support\_elicitation\_unguided} cell in Experiment 1's reliability matrix: the delta isolates what the \texttt{tool\_choice="required"} constraint contributes at the choice layer. The hypothesis is that removing layer 3 surfaces a distinct failure class (the model ends a turn with a chatty reply while structured capture is still pending), which the completion-rate and turns-to-resolution metrics should surface.
+
+\subsection{Layer 2 reference: strict JSON Schema}
+\label{app:layer2-strict}
+
+File: \texttt{support\_flow\_elicitation\_guided\_strict.tac}. Clone of the guided arm with three changes:
+\begin{enumerate}
+\item Every \texttt{FIELD\_DEFS[field].schema} is a closed JSON object: \texttt{type=object}, \texttt{additionalProperties=false}, \texttt{required=[\texttt{"value"}]}, with a per-field \texttt{value} subschema that carries the full \texttt{type}/\texttt{enum}/\texttt{pattern}/\texttt{minLength}/\texttt{maxLength} constraints the paper's validators already implement semantically.
+\item A \texttt{\_schema\_check(field, value)} helper runs before the existing extractor/validator, short-circuiting on \texttt{minLength}/\texttt{maxLength}/\texttt{enum}/\texttt{pattern} violations. Failures accumulate in a \texttt{strict\_violations} stream on the procedure state so the reliability harness can report how often the strict-check path fires.
+\item Every \texttt{collect\_field} return carries an explicit \texttt{strict=true} marker and echoes \texttt{requested\_schema} on rejection, so the LLM sees the schema it must satisfy when it re-submits.
+\end{enumerate}
+Reliability harness: \texttt{tests/test\_guided\_strict\_reliability.py}, marker \texttt{support\_guided\_strict\_reliability}. The harness reuses the Experiment-1 strict evaluator and outcome classifier unchanged, then additionally reports \texttt{strict\_violation\_total} across runs.
+
+\paragraph{Framework-level passthrough (Tactus gap).}
+The arm enforces the schema \emph{at the tool-handler level}, not at the provider's decoder. A Tactus-level passthrough that would take the same closed-object schema and attach it to the tool definition sent to the provider (OpenAI \texttt{strict: true}, Anthropic \texttt{input\_schema} with strict validation) is not exposed in the current \texttt{Agent} DSL. The reference implementation is the closest approximation we can ship without framework changes; a future revision can route the same \texttt{FIELD\_DEFS} schemas through a Tactus-level \texttt{strict=true} agent option once that flag exists, at which point the strict pre-check in the handler becomes a belt-and-suspenders guard rather than the load-bearing enforcement.
+
+\subsection{Layer 4 reference: durable resume across a simulated crash}
+\label{app:layer4-durable}
+
+File: \texttt{tests/test\_durable\_resume.py}, marker \texttt{support\_durable\_resume}. The test uses the deterministic scripted baseline (Appendix~\ref{app:scripted}) so the LLM is out of the agent path and the only source of non-determinism under test is Tactus's own checkpoint-and-replay machinery.
+
+\paragraph{Procedure.}
+A persistent \texttt{FileStorage} backend is created under \texttt{tmp\_path}. A reference run (separate storage, same \texttt{.tac}) establishes the expected total number of \texttt{Human.input} calls on a cold run. The test then constructs a \texttt{CrashingHITLHandler} that answers the first $N \approx \lfloor \text{cold\_total}/2 \rfloor$ HITL calls with ground-truth values and raises \texttt{\_SimulatedCrash} on the $(N+1)$-th. The first \texttt{TactusRuntime} executes against the shared storage and terminates with a failure. A second \texttt{TactusRuntime} is then constructed against the same storage directory and the same \texttt{procedure\_id}; its HITL handler is a fresh \texttt{CrashingHITLHandler} with crash disabled.
+
+\paragraph{Assertions.}
+The second run must satisfy three properties: \texttt{result.completed == true}; the resumed HITL call count must be strictly less than the cold reference (the cached HITL replies from the execution log should short-circuit the re-prompts); the final result dict must match the persona's ground truth on every canonical field (so the cached replies are being consumed for the right fields, not just dropped on the floor).
+
+\paragraph{What this does not test.}
+The reference deliberately does not measure reliability-matrix-level rates across the three personas; a layer-4 reliability study would parametrize the crash point, persona, and number of resumes, and would measure \emph{the probability of successful completion given a crash at each HITL call index}. That study is a direct extension once the Tactus storage semantics are deemed production-ready for the benchmark; the reference establishes that the substrate works end-to-end on our benchmark.
+
+\subsection{Layer 5 reference: accept/decline/cancel trichotomy}
+\label{app:layer5-trichotomy}
+
+Files: \texttt{support\_flow\_elicitation\_guided\_trichotomy.tac}, plus a \texttt{trichotomy} client mode added to \texttt{tests/llm\_hitl\_handler.py}, plus per-persona \texttt{trichotomy\_actions} blocks in \texttt{tests/support\_personas.py}. Reliability harness: \texttt{tests/test\_guided\_trichotomy\_reliability.py}, marker \texttt{support\_guided\_trichotomy\_reliability}.
+
+\paragraph{Protocol contract.}
+\texttt{collect\_field} inspects the user's most recent reply for two sentinels before treating it as a field value: \texttt{[ELICITATION \textperiodcentered\ DECLINE]} and \texttt{[ELICITATION \textperiodcentered\ CANCEL]}. On \texttt{decline}, the handler consults a per-field \texttt{DECLINABLE} table (today: \texttt{device\_model = true}; every other field \texttt{false}) and either records the decline (storing \texttt{"(declined)"} and moving on) or rejects it and re-elicits. On \texttt{cancel}, the handler sets \texttt{state.cancelled = true}, logs the cancelling field, emits a closing user message, and the procedure's main loop breaks at the start of the next iteration; the return carries \texttt{completed=false, cancelled=true}. A \texttt{protocol\_events} trace records every accept/decline/cancel event with field and reason.
+
+\paragraph{Per-persona expectations.}
+The three personas exercise three distinct outcomes under trichotomy mode. The rambler persona has no overrides and should \texttt{accept\_ok} on every field (baseline parity). The billing persona has \texttt{callback\_phone: cancel} and should \texttt{cancelled\_ok} (the run ends cleanly before \texttt{plan\_approval} is reached). The technical persona has \texttt{device\_model: decline} and should \texttt{declined\_ok} (the optional field is skipped, the rest of the flow completes normally). \texttt{test\_guided\_trichotomy\_reliability.py} defines a per-persona \texttt{expected\_outcome} and reports \texttt{expected\_outcome\_rate} as its headline metric.
+
+\paragraph{What this does not test.}
+The reference uses the same three personas as the headline experiments; extending trichotomy to the full reliability matrix would require persona variants that cancel at different points in the flow, decline at different optional fields, and mix trichotomy actions within a run. The simulator's current \texttt{trichotomy\_actions} is a single map from field to action and fires at most once per field; a richer simulator would model probabilistic decline/cancel over turns.
+
+\subsection{Nested elicitation reference}
+\label{app:nested-ref}
+
+File: \texttt{support\_flow\_elicitation\_nested.tac}. Reliability harness: \texttt{tests/test\_nested\_reliability.py}, marker \texttt{support\_nested\_reliability}.
+
+\paragraph{Implementation.}
+A frame stack lives on procedure state: each entry carries \texttt{\{depth, parent, field, state\}}. Every \texttt{collect\_field} return payload includes a \texttt{frame\_stack} snapshot, a \texttt{depth} integer, and a \texttt{parent} pointer (name of the opening field, or \texttt{nil} at depth 0). When \texttt{account\_email} is accepted at depth 0 and verification has not yet happened, the handler pushes an inner \texttt{verification\_code} frame (synthetic 4-digit code with \texttt{pattern="\^{}\textbackslash d\{4\}\$"}) and returns an \texttt{accepted} payload carrying \texttt{nested\_opened=\{field, parent, depth\}}. The outer \texttt{account\_email} frame does not fully resolve until the inner frame closes: \texttt{blocked\_reason} is extended so that, while a nested frame is open, \emph{only that frame's field} may be collected.
+
+\paragraph{Simulator support.}
+The simulator's elicitation-form handler falls through to a canned \texttt{"1234"} reply when \texttt{verification\_code} is requested (the synthetic field is not in any persona's ground truth). The rest of the flow is unchanged; any of the three personas can drive the nested arm.
+
+\paragraph{What this does not test.}
+The comparison against a flat variant (in which the LLM manages verification at the top level with no visible parent--child relationship) is the actual experiment Appendix~\ref{app:nested} names as the candidate first study; we ship the nested arm but not the flat arm, so the reliability comparison is future work. The reference nonetheless establishes that the visible-stack protocol is implementable against the existing elicitation contract without breaking simulator parity --- the frame-stack snapshot is additive on every return, and clients that ignore it behave exactly as before.
+
+\paragraph{What the reference reports.}
+\texttt{test\_nested\_reliability.py} reports the usual strict-success and completion rates, plus \texttt{nested\_opened\_runs} (runs whose \texttt{max\_frame\_depth} reached 1) and \texttt{verification\_done\_runs} (runs where the inner frame closed successfully). Both should be near-100\% under \texttt{ideal} on a correct implementation; the metrics are included so a regression in the nested-frame code shows up in the reliability artifact rather than as a silent correctness drift.
 
 \end{document}
