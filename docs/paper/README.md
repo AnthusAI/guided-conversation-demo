@@ -13,9 +13,10 @@ Research-style draft in [`main.tex`](main.tex). It develops a broader argument f
 **Appendices.**
 
 - **Appendix A — Hooks and elicitations as orthogonal concepts.** Position (*where* code runs) and payload shape (*what* is carried) are independent axes. The guided arm exercises both in a bundled way; three ablations would isolate them.
-- **Appendix B — Hook enforcement layers.** A five-layer framework — positional, decoder-level, choice-level, durable-execution, protocol-level — for reasoning about how a hook is enforced. The paper's experiments exercise layers 1 and 3; §12's follow-ons each isolate one of the other three.
+- **Appendix B — Hook enforcement layers.** A five-layer framework — positional, decoder-level, choice-level, durable-execution, protocol-level — for reasoning about how a hook is enforced. Headline experiments exercise layers 1 and 3; Appendix E ships reference implementations for 2, 4, and 5.
 - **Appendix C — Deterministic scripted baseline (Arm C).** Specification and rationale for a non-LLM reference arm. Procedure lives in `support_flow_scripted_baseline.tac` at the repo root; the reliability test is `tests/test_scripted_baseline_reliability.py`.
-- **Appendix D — Nested elicitation protocol.** A specification sketch for recursive MCP-style elicitations: a visible call stack of active frames, each with explicit depth and parent-pointer context. Protocol only — no experiment is run against it yet.
+- **Appendix D — Nested elicitation protocol.** A specification sketch for recursive MCP-style elicitations: a visible call stack of active frames, each with explicit depth and parent-pointer context. A reference implementation ships (Appendix E); the flat-vs-nested controlled comparison is future work.
+- **Appendix E — Per-layer reference implementations.** Indexes one shippable reference per enforcement layer: Arm *guided_strict* (layer 2), `tests/test_durable_resume.py` against Tactus `FileStorage` checkpointing (layer 4), Arm *guided_trichotomy* with an extended simulator client mode (layer 5), plus a layer-3 ablation (Arm *unguided_auto*) and the nested-elicitation reference (Arm *nested*). Each reference is the smallest independently shippable isolation of one mechanism, not a full reliability study.
 
 ## Prerequisites
 

@@ -48,6 +48,12 @@ SUPPORT_PERSONAS = {
             ),
             "related_fields": ("issue_summary", "issue_category"),
         },
+        # Trichotomy overrides (Appendix E.5 / Layer 5). Maps field name -> one of
+        # "accept" | "decline" | "cancel". When the simulator receives an elicitation
+        # for a listed field under client_mode="trichotomy", it replies with the
+        # corresponding protocol-level signal instead of a value. The rambler
+        # persona accepts every field (trichotomy-mode parity baseline).
+        "trichotomy_actions": {},
     },
     "support_billing": {
         "description": (
@@ -84,6 +90,12 @@ SUPPORT_PERSONAS = {
             ),
             "related_fields": ("issue_summary", "issue_category"),
         },
+        # The billing persona exercises the MCP ``cancel`` terminal state: when
+        # the agent asks for callback_phone, the user ends the session. The
+        # procedure should return completed=false, cancelled=true.
+        "trichotomy_actions": {
+            "callback_phone": "cancel",
+        },
     },
     "support_technical": {
         "description": (
@@ -115,6 +127,13 @@ SUPPORT_PERSONAS = {
                 "every hour",
             ),
             "related_fields": ("issue_summary", "issue_category", "device_model"),
+        },
+        # The technical persona exercises the MCP ``decline`` terminal state on
+        # the optional device_model field. The procedure treats device_model as
+        # declinable on the technical branch and records a decline rather than
+        # re-eliciting; the flow otherwise completes normally.
+        "trichotomy_actions": {
+            "device_model": "decline",
         },
     },
 }
