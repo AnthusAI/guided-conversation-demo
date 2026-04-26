@@ -1,0 +1,39 @@
+% Experiment 1 user-turn distribution box plot.
+% Four boxes: (unguided, strict_ok), (unguided, not_strict_ok),
+%             (guided,   strict_ok), (guided,   not_strict_ok).
+% Data: diagrams/data/exp1_turns.csv (precomputed q1/median/q3/min/max).
+
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth, height=58mm,
+    boxplot/draw direction=x,
+    enlarge y limits=0.20,
+    ytick={1,2,3,4},
+    yticklabels={
+      {unguided, \texttt{strict\_ok}},
+      {unguided, not \texttt{strict\_ok}},
+      {guided, \texttt{strict\_ok}},
+      {guided, not \texttt{strict\_ok}}
+    },
+    yticklabel style={font=\sffamily\scriptsize},
+    xticklabel style={font=\sffamily\scriptsize},
+    xlabel={User-turn count per run (pooled across personas \& modes)},
+    grid=major, grid style={dashed, gray!30},
+    xmin=0, xmax=120,
+]
+
+% Each \addplot uses the boxplot prepared style with the row's q1/med/q3/min/max.
+\addplot+[boxplot prepared={
+    lower whisker=8, lower quartile=13, median=16, upper quartile=21, upper whisker=98,
+  }, draw=ungOrange, fill=ungOrange!30] coordinates {};
+\addplot+[boxplot prepared={
+    lower whisker=8, lower quartile=102, median=106, upper quartile=108, upper whisker=114,
+  }, draw=ungOrange!80!black, fill=ungOrange!50] coordinates {};
+\addplot+[boxplot prepared={
+    lower whisker=11, lower quartile=13, median=14, upper quartile=15, upper whisker=23,
+  }, draw=guGreen, fill=guGreen!25] coordinates {};
+\addplot+[boxplot prepared={
+    lower whisker=12, lower quartile=14, median=16, upper quartile=17, upper whisker=24,
+  }, draw=guGreen!80!black, fill=guGreen!45] coordinates {};
+\end{axis}
+\end{tikzpicture}

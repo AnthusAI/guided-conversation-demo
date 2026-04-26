@@ -1,0 +1,5 @@
+cell arm outcome_class n mean min max q1 median q3
+unguided-strict-ok unguided strict_ok 330 19.32 8 98 13.0 16.0 21.0
+unguided-not-strict-ok unguided not_strict_ok 270 94.78 8 114 102.0 106.0 108.0
+guided-strict-ok guided strict_ok 512 14.41 11 23 13.0 14.0 15.0
+guided-not-strict-ok guided not_strict_ok 88 15.81 12 24 14.0 16.0 17.0

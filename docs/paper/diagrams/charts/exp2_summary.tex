@@ -1,0 +1,61 @@
+% Experiment 2 three-metric grouped bar chart.
+% Three bars per (arm, persona) cell: strict success ex-infra, completion,
+% hung-up rate. Wilson 95% CI error bars. Data: diagrams/data/exp2_summary.csv.
+% The persona-shaped rigid-vs-loose trade-off shows up as the loose
+% orchestrator's hung-up bar towering on rambler.
+
+\begin{tikzpicture}
+\begin{groupplot}[
+    group style={group size=1 by 3, vertical sep=18mm},
+    width=\linewidth, height=42mm,
+    ybar,
+    enlarge x limits=0.10,
+    ymin=0, ymax=110,
+    ytick={0,20,40,60,80,100},
+    yticklabel style={font=\sffamily\scriptsize},
+    symbolic x coords={
+      upfront-rambler, upfront-billing, upfront-technical,
+      rigid-rambler,   rigid-billing,   rigid-technical,
+      loose-rambler,   loose-billing,   loose-technical
+    },
+    xtick=data,
+    xticklabel style={rotate=30, anchor=north east, font=\sffamily\tiny},
+    legend style={
+      font=\sffamily\scriptsize, draw=rulegray, fill=white,
+      at={(0.98,0.98)}, anchor=north east,
+    },
+    every axis plot/.append style={fill opacity=0.85, draw opacity=0.9},
+    error bars/y dir=both, error bars/y explicit,
+    error bars/error bar style={line width=0.4pt, color=black},
+    grid=major, grid style={dashed, gray!30},
+]
+
+% --- Panel 1: strict success ex-infra ---
+\nextgroupplot[ylabel={Strict success ex-infra (\%)}]
+\addplot+[fill=guGreen, draw=guGreen]
+  table[col sep=space, x=cell, y=strict,
+        y error plus expr=\thisrow{s_hi}-\thisrow{strict},
+        y error minus expr=\thisrow{strict}-\thisrow{s_lo}]
+  {diagrams/data/exp2_summary.csv};
+\legend{strict success ex-infra}
+
+% --- Panel 2: completion ---
+\nextgroupplot[ylabel={Completion (\%)}]
+\addplot+[fill=taskBlue, draw=taskBlue]
+  table[col sep=space, x=cell, y=completion,
+        y error plus expr=\thisrow{c_hi}-\thisrow{completion},
+        y error minus expr=\thisrow{completion}-\thisrow{c_lo}]
+  {diagrams/data/exp2_summary.csv};
+\legend{completion (called \texttt{done})}
+
+% --- Panel 3: hung-up rate ---
+\nextgroupplot[ylabel={Hung-up rate (\%)}, ymax=30, ytick={0,10,20,30}]
+\addplot+[fill=violet!70!black, draw=violet!70!black]
+  table[col sep=space, x=cell, y=hungup,
+        y error plus expr=\thisrow{h_hi}-\thisrow{hungup},
+        y error minus expr=\thisrow{hungup}-\thisrow{h_lo}]
+  {diagrams/data/exp2_summary.csv};
+\legend{hung-up rate (patience exhausted)}
+
+\end{groupplot}
+\end{tikzpicture}

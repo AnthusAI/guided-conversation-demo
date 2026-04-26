@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """
-Compile GraphViz diagrams and the LaTeX paper under docs/paper/.
+Compile the LaTeX paper under docs/paper/.
 
   python scripts/build_paper.py
   python scripts/build_paper.py --watch   # requires: pip install -e ".[docs]"
 
-Output: docs/paper/build/main.pdf (and diagrams/out/*.pdf from .dot sources).
+All diagrams are TikZ (no GraphViz dependency). Data-driven charts read
+CSV files emitted by ``scripts/export_chart_data.py`` from the
+``tests/results_*.json`` artifacts; this script runs that export step
+automatically before invoking pdflatex.
+
+Output: docs/paper/build/main.pdf and docs/paper/diagrams/data/*.csv.
 """
 
 from __future__ import annotations
@@ -26,7 +31,7 @@ def _repo_root() -> Path:
 def _require_cmd(name: str) -> str:
     path = shutil.which(name)
     if not path:
-        print(f"error: '{name}' not found on PATH (install GraphViz / TeX).", file=sys.stderr)
+        print(f"error: '{name}' not found on PATH (install TeX).", file=sys.stderr)
         sys.exit(1)
     return path
 
@@ -39,27 +44,28 @@ def _ignored_path(paper_dir: Path, path: Path) -> bool:
     parts = rel.parts
     if parts and parts[0] == "build":
         return True
-    if len(parts) >= 2 and parts[0] == "diagrams" and parts[1] == "out":
-        return True
     return False
 
 
-def compile_dot_diagrams(paper_dir: Path) -> None:
-    _require_cmd("dot")
-    diag = paper_dir / "diagrams"
-    out = diag / "out"
-    out.mkdir(parents=True, exist_ok=True)
-    dots = sorted(diag.glob("*.dot"))
-    if not dots:
-        print("warning: no .dot files under diagrams/", file=sys.stderr)
-    for dot in dots:
-        pdf = out / f"{dot.stem}.pdf"
-        subprocess.run(
-            ["dot", "-Tpdf", "-o", str(pdf), str(dot)],
-            check=True,
-            cwd=paper_dir,
+def export_chart_data(repo: Path) -> None:
+    """Re-emit per-chart CSVs from existing JSON artifacts.
+
+    Idempotent and cheap; safe to run on every build. Failures are downgraded
+    to warnings so a missing artifact does not block the LaTeX build (the
+    figures will simply use the previously-committed CSV instead).
+    """
+    script = repo / "scripts" / "export_chart_data.py"
+    if not script.is_file():
+        print(f"warning: chart-data exporter missing: {script}", file=sys.stderr)
+        return
+    try:
+        subprocess.run([sys.executable, str(script)], check=True, cwd=repo)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"warning: chart-data export failed (rc={e.returncode}); "
+            f"using previously-committed CSVs.",
+            file=sys.stderr,
         )
-        print(f"  dot → {pdf.relative_to(paper_dir)}")
 
 
 def compile_latex(paper_dir: Path) -> None:
@@ -104,7 +110,7 @@ def compile_latex(paper_dir: Path) -> None:
 def build(paper_dir: Path) -> None:
     paper_dir = paper_dir.resolve()
     print(f"Building paper in {paper_dir} …")
-    compile_dot_diagrams(paper_dir)
+    export_chart_data(_repo_root())
     compile_latex(paper_dir)
     print("Done.")
 
@@ -143,7 +149,7 @@ def watch(paper_dir: Path, debounce_s: float = 0.45) -> None:
             path = Path(event.src_path)
             if _ignored_path(paper_dir, path):
                 return
-            if path.suffix.lower() not in (".tex", ".dot"):
+            if path.suffix.lower() not in (".tex", ".csv"):
                 return
             print(f"[watch] change: {path.name}")
             schedule()
@@ -154,7 +160,7 @@ def watch(paper_dir: Path, debounce_s: float = 0.45) -> None:
             path = Path(event.src_path)
             if _ignored_path(paper_dir, path):
                 return
-            if path.suffix.lower() not in (".tex", ".dot"):
+            if path.suffix.lower() not in (".tex", ".csv"):
                 return
             print(f"[watch] new: {path.name}")
             schedule()
@@ -162,7 +168,7 @@ def watch(paper_dir: Path, debounce_s: float = 0.45) -> None:
     obs = Observer()
     obs.schedule(Handler(), str(paper_dir), recursive=True)
     obs.start()
-    print(f"Watching {paper_dir} for .tex and .dot (debounce {debounce_s}s). Ctrl+C to stop.")
+    print(f"Watching {paper_dir} for .tex and .csv (debounce {debounce_s}s). Ctrl+C to stop.")
     build(paper_dir)
     try:
         while obs.is_alive():
@@ -175,7 +181,7 @@ def watch(paper_dir: Path, debounce_s: float = 0.45) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build LaTeX paper + GraphViz diagrams.")
+    parser = argparse.ArgumentParser(description="Build the LaTeX paper.")
     parser.add_argument(
         "--paper-dir",
         type=Path,
@@ -185,7 +191,7 @@ def main() -> int:
     parser.add_argument(
         "--watch",
         action="store_true",
-        help="Rebuild when .tex or .dot files change (requires watchdog).",
+        help="Rebuild when .tex or .csv files change (requires watchdog).",
     )
     parser.add_argument(
         "--debounce",

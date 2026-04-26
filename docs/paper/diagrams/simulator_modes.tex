@@ -1,0 +1,67 @@
+% Figure: simulator client modes (ideal / non_ideal / impatient).
+%
+% Three columns, one per mode, each listing the behavioral knobs that mode
+% applies on top of a persona's private ground truth. The numerical
+% parameters are taken from tests/llm_hitl_handler.py module constants
+% (P_CLEAN, P_FORMAT_NOISE, P_REFUSAL, P_WRONG_THEN_CORRECT,
+% PATIENCE_BUDGET_DEFAULT). Keep these in sync with that file if you change
+% the defaults.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    modeBox/.style={diagBox, text width=53mm, align=left, minimum height=12mm,
+                    inner sep=6pt, font=\sffamily\scriptsize, anchor=north west},
+    modeIdeal/.style={modeBox, draw=guGreen, fill=guBg!50},
+    modeNoisy/.style={modeBox, draw=oobAmber, fill=oobBg},
+    modeImpatient/.style={modeBox, draw=violet!70!black, fill=violet!10},
+]
+
+% Column 1: ideal
+\node[modeIdeal] (ideal) at (0,0)
+   {\textbf{ideal}\par\smallskip
+    Cooperative structured client. At any
+    \texttt{[ELICITATION$\cdot$FORM]} prompt, returns the
+    requested ground-truth field exactly, in the format the
+    validator expects. No noise, no refusals, no rephrasing.\par\smallskip
+    \textbf{Knobs:} (none)\par\smallskip
+    \emph{Used in: Experiment 1}};
+
+% Column 2: non_ideal
+\node[modeNoisy] (noisy) at ($(ideal.north east) + (6mm, 0)$)
+   {\textbf{non\_ideal}\par\smallskip
+    On the first ask of each elicitation field, samples one
+    of four behaviors (subsequent asks converge to clean):\par\smallskip
+    \textbf{Knobs (per first ask):}\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ \texttt{P\_CLEAN = 0.35} --- ground-truth, clean.\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ \texttt{P\_FORMAT\_NOISE = 0.30} --- well-formed
+    but wrong (e.g.\ phone with a bumped digit).\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ \texttt{P\_REFUSAL = 0.15} --- ``I'd rather not.''\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ \texttt{P\_WRONG\_THEN\_CORRECT = 0.20} ---
+    wrong, then ground-truth on re-ask.\par\smallskip
+    \emph{Used in: Experiment 1}};
+
+% Column 3: impatient
+\node[modeImpatient] (impatient) at ($(noisy.north east) + (6mm, 0)$)
+   {\textbf{impatient}\par\smallskip
+    Cooperative on values, opinionated on phase order. Each
+    persona has a \texttt{preferred\_topic}; the simulator
+    tracks whether the agent engages with it or deflects.\par\smallskip
+    \textbf{Knobs:}\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ \texttt{patience\_budget $B = 3$} (initial).\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ engagement with topic resets $B$.\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ each detected deflection: $B \mathrel{-}{=}\,1$.\par
+    \hangindent=2.4mm\hangafter=1
+    $\bullet$ when $B = 0$: simulator emits
+    \texttt{HUNG\_UP\_SENTINEL} and the run terminates as
+    \texttt{hung\_up}.\par\smallskip
+    \emph{Used in: Experiment 2}};
+
+\end{tikzpicture}

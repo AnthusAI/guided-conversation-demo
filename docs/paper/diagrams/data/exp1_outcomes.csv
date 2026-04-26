@@ -1,0 +1,13 @@
+cell arm mode persona strict_ok completed_strict_fail incomplete infra_error
+U-i-ramb unguided ideal rambler 67 3 30 0
+U-i-bill unguided ideal billing 44 3 53 0
+U-i-tech unguided ideal technical 49 7 44 0
+U-n-ramb unguided non_ideal rambler 68 5 27 0
+U-n-bill unguided non_ideal billing 47 6 47 0
+U-n-tech unguided non_ideal technical 55 4 41 0
+G-i-ramb guided ideal rambler 100 0 0 0
+G-i-bill guided ideal billing 100 0 0 0
+G-i-tech guided ideal technical 97 3 0 0
+G-n-ramb guided non_ideal rambler 73 27 0 0
+G-n-bill guided non_ideal billing 88 12 0 0
+G-n-tech guided non_ideal technical 54 46 0 0

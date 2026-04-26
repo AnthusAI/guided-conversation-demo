@@ -1,0 +1,83 @@
+% Figure: Experiment 2 orchestrator phase structures.
+%
+% Side-by-side comparison of the rigid orchestrator (strictly linear phase
+% sequence) and the loose orchestrator (same nodes plus an acknowledge_topic
+% phase that runs once, immediately after the privacy disclosure, before any
+% form-filling). The compliance_recording_done gate is the same in both arms
+% (it is a non-negotiable compliance prerequisite).
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    phase/.style={diagBoxG, minimum width=22mm, minimum height=8mm,
+                  text width=22mm, font=\sffamily\scriptsize},
+    phaseRigid/.style={phase, draw=ungOrange, fill=ungBg!50},
+    phaseLoose/.style={phase, draw=guGreen, fill=guBg!60},
+    ackPhase/.style={phaseLoose, draw=oobAmber, fill=oobBg, line width=0.7pt},
+    gate/.style={diagBoxT, minimum width=22mm, minimum height=8mm, text width=22mm,
+                 font=\sffamily\scriptsize\itshape},
+    decision/.style={diagBoxT, draw=oobAmber, fill=oobBg,
+                     diamond, aspect=2,
+                     font=\sffamily\scriptsize, inner sep=2pt, align=center,
+                     line width=0.5pt, minimum width=24mm, minimum height=10mm},
+]
+
+% =================== RIGID PANEL ===================
+\begin{scope}[shift={(0,0)}]
+  \node[panelLabelU, anchor=south] (rTitle) at (1.2,7.2)
+       {Rigid orchestrator};
+  \node[gate]                                      (rGate)  at (1.2, 6.0) {privacy /\\recording disclosure};
+  \node[phaseRigid, below=5mm of rGate]            (rCat)   {issue\_category};
+  \node[phaseRigid, below=5mm of rCat]             (rCore)  {core fields\\(\texttt{account\_email},\\\texttt{issue\_summary},\\\texttt{callback\_phone})};
+  \node[decision,   below=5mm of rCore]            (rBranch){branch?};
+  \node[phaseRigid, below left=8mm and 0mm of rBranch] (rTech) {\texttt{device\_model}};
+  \node[phaseRigid, below right=8mm and 0mm of rBranch](rBill) {fee\_terms +\\\texttt{billing\_charge\_-\\acknowledged}};
+  \node[phaseRigid, below=18mm of rBranch]         (rPlan)  {plan +\\\texttt{plan\_approval}};
+  \node[diagBoxG, below=5mm of rPlan, fill=guBg]   (rDone)  {\texttt{done()}};
+
+  \draw[flowU] (rGate)  -- (rCat);
+  \draw[flowU] (rCat)   -- (rCore);
+  \draw[flowU] (rCore)  -- (rBranch);
+  \draw[flowU] (rBranch) -- node[edgelbl, left=2mm] {tech} (rTech);
+  \draw[flowU] (rBranch) -- node[edgelbl, right=2mm] {billing} (rBill);
+  \draw[flowU] (rBranch) -- node[edgelbl, right=1mm, pos=0.2] {general} (rPlan);
+  \draw[flowU] (rTech.south) .. controls +(0,-0.6) and +(-1.0,0.4) .. (rPlan.west);
+  \draw[flowU] (rBill.south) .. controls +(0,-0.6) and +(1.0,0.4) .. (rPlan.east);
+  \draw[flowU] (rPlan)  -- (rDone);
+
+  \node[anchor=north, font=\sffamily\scriptsize\itshape, color=ungOrange,
+        text width=46mm, align=center, below=4mm of rDone]
+       {Strict canonical order. User off-topic asks are deferred.};
+\end{scope}
+
+% =================== LOOSE PANEL ===================
+\begin{scope}[shift={(7.5,0)}]
+  \node[panelLabelG, anchor=south] (lTitle) at (1.2,7.2)
+       {Loose orchestrator};
+  \node[gate]                                      (lGate)  at (1.2, 6.0) {privacy /\\recording disclosure};
+  \node[ackPhase, below=5mm of lGate]              (lAck)   {acknowledge\_topic\\\textit{(runs once)}};
+  \node[phaseLoose, below=5mm of lAck]             (lCat)   {issue\_category};
+  \node[phaseLoose, below=5mm of lCat]             (lCore)  {core fields\\(\texttt{account\_email},\\\texttt{issue\_summary},\\\texttt{callback\_phone})};
+  \node[decision,   below=5mm of lCore]            (lBranch){branch?};
+  \node[phaseLoose, below left=8mm and 0mm of lBranch] (lTech) {\texttt{device\_model}};
+  \node[phaseLoose, below right=8mm and 0mm of lBranch](lBill) {fee\_terms +\\\texttt{billing\_charge\_-\\acknowledged}};
+  \node[phaseLoose, below=18mm of lBranch]         (lPlan)  {plan +\\\texttt{plan\_approval}};
+  \node[diagBoxG, below=5mm of lPlan, fill=guBg]   (lDone)  {\texttt{done()}};
+
+  \draw[flowG] (lGate)  -- node[edgelbl, right] {compliance gate} (lAck);
+  \draw[flowG] (lAck)   -- (lCat);
+  \draw[flowG] (lCat)   -- (lCore);
+  \draw[flowG] (lCore)  -- (lBranch);
+  \draw[flowG] (lBranch) -- node[edgelbl, left=2mm] {tech} (lTech);
+  \draw[flowG] (lBranch) -- node[edgelbl, right=2mm] {billing} (lBill);
+  \draw[flowG] (lBranch) -- node[edgelbl, right=1mm, pos=0.2] {general} (lPlan);
+  \draw[flowG] (lTech.south) .. controls +(0,-0.6) and +(-1.0,0.4) .. (lPlan.west);
+  \draw[flowG] (lBill.south) .. controls +(0,-0.6) and +(1.0,0.4) .. (lPlan.east);
+  \draw[flowG] (lPlan)  -- (lDone);
+
+  \node[anchor=north, font=\sffamily\scriptsize\itshape, color=guGreen,
+        text width=48mm, align=center, below=4mm of lDone]
+       {One topic-acknowledgment turn after the gate; the rest of the order is the same.};
+\end{scope}
+
+\end{tikzpicture}

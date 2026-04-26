@@ -1,7 +1,7 @@
 {
   "experiment": "support_orchestrated",
   "description": "Support flow (orchestrated, impatient client) \u2014 upfront vs rigid vs loose \u2014 summary (strict ex-infra, completion, hung-up, engagement-aware completion, infra; impatient client)",
-  "run_tag": "exp2_pilot10",
+  "run_tag": "exp2_full100",
   "results_suffix": null,
   "baseline_variant": "support_orchestrated_upfront",
   "variants": [
@@ -19,16 +19,16 @@
       "variants": {
         "support_orchestrated_upfront": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.5,
-            "strict_ex_infra": 0.5,
-            "completion_rate": 0.6,
+            "runs": 100,
+            "strict_all": 0.4,
+            "strict_ex_infra": 0.4,
+            "completion_rate": 0.41,
             "infra_failure_rate": 0.0,
             "infra_count": 0,
             "hung_up_rate": 0.0,
             "engagement_aware_completion_rate": 1.0,
             "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 10,
+            "engagement_aware_engaged_runs": 100,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null
@@ -36,16 +36,16 @@
         },
         "support_orchestrated_rigid": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.6,
-            "strict_ex_infra": 0.6,
-            "completion_rate": 1.0,
+            "runs": 100,
+            "strict_all": 0.8,
+            "strict_ex_infra": 0.8,
+            "completion_rate": 0.98,
             "infra_failure_rate": 0.0,
             "infra_count": 0,
-            "hung_up_rate": 0.0,
-            "engagement_aware_completion_rate": 1.0,
-            "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 6,
+            "hung_up_rate": 0.02,
+            "engagement_aware_completion_rate": 0.98,
+            "hung_up_runs": 2,
+            "engagement_aware_engaged_runs": 80,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null
@@ -53,16 +53,16 @@
         },
         "support_orchestrated_loose": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.9,
-            "strict_ex_infra": 0.9,
-            "completion_rate": 0.9,
+            "runs": 100,
+            "strict_all": 0.78,
+            "strict_ex_infra": 0.78,
+            "completion_rate": 0.84,
             "infra_failure_rate": 0.0,
             "infra_count": 0,
-            "hung_up_rate": 0.1,
-            "engagement_aware_completion_rate": 0.9,
-            "hung_up_runs": 1,
-            "engagement_aware_engaged_runs": 10,
+            "hung_up_rate": 0.16,
+            "engagement_aware_completion_rate": 0.84,
+            "hung_up_runs": 16,
+            "engagement_aware_engaged_runs": 100,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null
@@ -76,16 +76,16 @@
       "variants": {
         "support_orchestrated_upfront": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.5,
-            "strict_ex_infra": 0.5,
-            "completion_rate": 0.5,
+            "runs": 100,
+            "strict_all": 0.46,
+            "strict_ex_infra": 0.46,
+            "completion_rate": 0.46,
             "infra_failure_rate": 0.0,
             "infra_count": 0,
             "hung_up_rate": 0.0,
             "engagement_aware_completion_rate": 1.0,
             "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 9,
+            "engagement_aware_engaged_runs": 100,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null
@@ -93,24 +93,7 @@
         },
         "support_orchestrated_rigid": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.9,
-            "strict_ex_infra": 0.9,
-            "completion_rate": 0.9,
-            "infra_failure_rate": 0.0,
-            "infra_count": 0,
-            "hung_up_rate": 0.1,
-            "engagement_aware_completion_rate": 0.9,
-            "hung_up_runs": 1,
-            "engagement_aware_engaged_runs": 9,
-            "verifier_checked_runs": null,
-            "verifier_order_ok_rate": null,
-            "verifier_branch_ok_rate": null
-          }
-        },
-        "support_orchestrated_loose": {
-          "impatient": {
-            "runs": 10,
+            "runs": 100,
             "strict_all": 1.0,
             "strict_ex_infra": 1.0,
             "completion_rate": 1.0,
@@ -119,7 +102,24 @@
             "hung_up_rate": 0.0,
             "engagement_aware_completion_rate": 1.0,
             "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 10,
+            "engagement_aware_engaged_runs": 89,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_loose": {
+          "impatient": {
+            "runs": 100,
+            "strict_all": 0.98,
+            "strict_ex_infra": 0.98,
+            "completion_rate": 0.98,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.02,
+            "engagement_aware_completion_rate": 0.98,
+            "hung_up_runs": 2,
+            "engagement_aware_engaged_runs": 100,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null
@@ -133,16 +133,16 @@
       "variants": {
         "support_orchestrated_upfront": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.3,
-            "strict_ex_infra": 0.3,
-            "completion_rate": 0.3,
+            "runs": 100,
+            "strict_all": 0.35,
+            "strict_ex_infra": 0.35,
+            "completion_rate": 0.36,
             "infra_failure_rate": 0.0,
             "infra_count": 0,
             "hung_up_rate": 0.0,
             "engagement_aware_completion_rate": 1.0,
             "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 10,
+            "engagement_aware_engaged_runs": 100,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null
@@ -150,24 +150,7 @@
         },
         "support_orchestrated_rigid": {
           "impatient": {
-            "runs": 10,
-            "strict_all": 0.6,
-            "strict_ex_infra": 0.6,
-            "completion_rate": 1.0,
-            "infra_failure_rate": 0.0,
-            "infra_count": 0,
-            "hung_up_rate": 0.0,
-            "engagement_aware_completion_rate": 1.0,
-            "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 6,
-            "verifier_checked_runs": null,
-            "verifier_order_ok_rate": null,
-            "verifier_branch_ok_rate": null
-          }
-        },
-        "support_orchestrated_loose": {
-          "impatient": {
-            "runs": 10,
+            "runs": 100,
             "strict_all": 0.7,
             "strict_ex_infra": 0.7,
             "completion_rate": 1.0,
@@ -176,7 +159,24 @@
             "hung_up_rate": 0.0,
             "engagement_aware_completion_rate": 1.0,
             "hung_up_runs": 0,
-            "engagement_aware_engaged_runs": 10,
+            "engagement_aware_engaged_runs": 76,
+            "verifier_checked_runs": null,
+            "verifier_order_ok_rate": null,
+            "verifier_branch_ok_rate": null
+          }
+        },
+        "support_orchestrated_loose": {
+          "impatient": {
+            "runs": 100,
+            "strict_all": 0.9,
+            "strict_ex_infra": 0.9,
+            "completion_rate": 1.0,
+            "infra_failure_rate": 0.0,
+            "infra_count": 0,
+            "hung_up_rate": 0.0,
+            "engagement_aware_completion_rate": 1.0,
+            "hung_up_runs": 0,
+            "engagement_aware_engaged_runs": 100,
             "verifier_checked_runs": null,
             "verifier_order_ok_rate": null,
             "verifier_branch_ok_rate": null

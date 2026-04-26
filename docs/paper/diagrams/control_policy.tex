@@ -1,0 +1,103 @@
+% Figure: control-policy comparison.
+%
+% Shared substrate (task, validators, simulator, model) sits at the top.
+% Two control policies sit below it: unguided (one large upfront prompt + a
+% generic record_field tool, LLM steers from its own checklist) and guided
+% (lean upfront prompt + a single collect_field tool that returns MCP-style
+% elicitation payloads at the moment the procedure has the next step).
+%
+% The LLM is in the user-facing conversational loop in BOTH arms; the
+% difference is the shape of the in-context guidance it receives.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    node distance=4mm and 6mm,
+]
+
+% ---- Shared substrate ----
+\begin{scope}
+\node[diagBoxT, text width=33mm] (task)
+  {Task \& branching rules\\\scriptsize disclosure $\to$ category $\to$
+   core $\to$ branch $\to$ plan + approval $\to$ done};
+\node[diagBoxT, right=of task, text width=27mm] (valid)
+  {Validators\\\scriptsize field formats, ordering,\\branch obligations};
+\node[diagBoxT, right=of valid, text width=28mm] (sim)
+  {Simulated user\\\scriptsize persona + private GT};
+\node[diagBoxT, right=of sim, text width=27mm] (model)
+  {Model\\\scriptsize \texttt{gpt-5.4-mini} (both roles)};
+
+\begin{pgfonlayer}{background}
+  \node[diagPanelT, fit=(task)(valid)(sim)(model),
+        label={[panelLabelT, anchor=north west, xshift=2pt]north west:Shared across both arms}] (subPanel) {};
+\end{pgfonlayer}
+\end{scope}
+
+% ---- Unguided arm ----
+\begin{scope}[shift={(-4.6,-5.6)}]
+\node[diagBoxU, text width=42mm] (uPrompt)
+  {Long upfront system prompt\\\scriptsize checklist: ordering, branch,\\completion, all fields};
+\node[diagBoxU, below=8mm of uPrompt.south, text width=42mm] (uLoop)
+  {LLM agent\\\scriptsize relies on its own checklist;\\chooses each turn:\\\texttt{record\_field} / \texttt{record\_compliance} /\\\texttt{chat\_only} / \texttt{done}};
+\node[diagBoxU, below=10mm of uLoop.south, text width=42mm] (uState)
+  {Procedure state\\\scriptsize validators only;\\no per-step guidance returned};
+\node[diagBoxU, below=8mm of uState.south, text width=42mm] (uDone)
+  {\texttt{done()} iff LLM judges\\workflow complete};
+
+\begin{pgfonlayer}{background}
+  \node[diagPanelU, fit=(uPrompt)(uLoop)(uState)(uDone),
+        label={[panelLabelU, anchor=north]north:Unguided}] (uPanel) {};
+\end{pgfonlayer}
+
+\draw[flowU] (uPrompt) -- node[edgelbl, right] {persistent system prompt} (uLoop);
+\draw[flowU] (uLoop)   -- node[edgelbl, right]
+                  {inline tool call\\\scriptsize (LLM-chosen timing)} (uState);
+\draw[flowU, dashed] (uState.west) .. controls +(-1.6,0) and +(-1.6,0) ..
+                  node[edgelbl, left=2mm] {pass / fail only} (uLoop.west);
+\draw[flowU, dashed] (uLoop) -- node[edgelbl, right] {judgment call} (uDone);
+\end{scope}
+
+% ---- Guided arm ----
+% Procedure box sits to the right of the tool box so it does not collide
+% with the unguided arm in the middle of the figure.
+\begin{scope}[shift={(2.6,-5.6)}]
+\node[diagBoxG, text width=42mm] (gPrompt)
+  {Lean upfront system prompt\\\scriptsize tool surface +\\how to read \texttt{collect\_field}'s return};
+\node[diagBoxG, below=8mm of gPrompt.south, text width=42mm] (gChat)
+  {LLM agent\\\scriptsize drives the user-facing turn;\\calls \texttt{collect\_field} /\\\texttt{record\_compliance} /\\\texttt{chat\_only} / \texttt{done}};
+\node[diagBoxG, below=14mm of gChat.south, text width=42mm] (gCheck)
+  {\texttt{collect\_field} tool\\\scriptsize returns MCP-style elicitation\\payload (message + schema)\\or accepted / blocked record};
+\node[diagBoxG, right=10mm of gCheck.east, text width=28mm, anchor=west] (gProc)
+  {Procedure\\\scriptsize tracks workflow position\\+ branch obligations};
+\node[diagBoxG, below=8mm of gCheck.south, text width=42mm] (gDone)
+  {\texttt{done()} gated by procedure\\\scriptsize rejects early calls};
+
+\begin{pgfonlayer}{background}
+  \node[diagPanelG, fit=(gPrompt)(gChat)(gCheck)(gProc)(gDone),
+        label={[panelLabelG, anchor=north]north:Guided}] (gPanel) {};
+\end{pgfonlayer}
+
+\draw[flowG] (gPrompt) -- node[edgelbl, right] {persistent system prompt} (gChat);
+\draw[flowG] (gProc.north) .. controls +(0,1.6) and +(2.4,0) ..
+                  node[edgelbl, above, pos=0.7]
+                  {\textsc{system} hint per turn:\\\scriptsize next required field}
+                  (gChat.east);
+\draw[flowG] (gChat) -- node[edgelbl, right]
+                  {\texttt{collect\_field(name [, value])}} (gCheck);
+\draw[flowG] (gCheck.east) -- node[edgelbl, above] {validate, store} (gProc.west);
+\draw[flowG, dashed] (gCheck.west) .. controls +(-1.8,0) and +(-1.8,0) ..
+                  node[edgelbl, left=2mm]
+                  {elicit / accepted / blocked\\\scriptsize payload (in-context)}
+                  (gChat.west);
+\draw[flowG, dashed] (gChat.east) .. controls +(2.6,-2.0) and +(2.6,2.0) ..
+                  node[edgelbl, right, pos=0.5] {call \texttt{done()}} (gDone.east);
+\draw[flowG] (gProc.south) |- node[edgelbl, above, pos=0.85] {gate} (gDone.east);
+\end{scope}
+
+% ---- Substrate to arms (faint connectors) ----
+\draw[flowDotted, color=rulegray]
+   (task.south)  .. controls +(0,-1.6) and +(0,1.6) .. (uPanel.north);
+\draw[flowDotted, color=rulegray]
+   (model.south) .. controls +(0,-1.6) and +(0,1.6) .. (gPanel.north);
+
+\end{tikzpicture}

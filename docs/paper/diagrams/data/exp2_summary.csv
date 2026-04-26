@@ -1,0 +1,10 @@
+cell arm persona strict s_lo s_hi completion c_lo c_hi hungup h_lo h_hi
+upfront-rambler upfront rambler 40.0 30.9 49.8 41.0 31.9 50.8 0.0 0.0 3.7
+upfront-billing upfront billing 46.0 36.6 55.7 46.0 36.6 55.7 0.0 0.0 3.7
+upfront-technical upfront technical 35.0 26.4 44.7 36.0 27.3 45.8 0.0 0.0 3.7
+rigid-rambler rigid rambler 80.0 71.1 86.7 98.0 93.0 99.4 2.0 0.6 7.0
+rigid-billing rigid billing 100.0 96.3 100.0 100.0 96.3 100.0 0.0 0.0 3.7
+rigid-technical rigid technical 70.0 60.4 78.1 100.0 96.3 100.0 0.0 0.0 3.7
+loose-rambler loose rambler 78.0 68.9 85.0 84.0 75.6 89.9 16.0 10.1 24.4
+loose-billing loose billing 98.0 93.0 99.4 98.0 93.0 99.4 2.0 0.6 7.0
+loose-technical loose technical 90.0 82.6 94.5 100.0 96.3 100.0 0.0 0.0 3.7

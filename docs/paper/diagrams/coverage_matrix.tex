@@ -1,0 +1,48 @@
+% Figure: experiment design coverage matrix.
+%
+% Three personas x three simulator client modes x N arms.  Cells indicate
+% which experiment covers each (persona, mode, arm) cell.  N=100 in every
+% covered cell.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\scriptsize},
+    cellH/.style={inner sep=2pt, font=\sffamily\bfseries\scriptsize},
+    cellL/.style={inner sep=2pt, font=\sffamily\itshape\scriptsize},
+    cell/.style={inner sep=4pt, minimum width=22mm, minimum height=8mm,
+                 align=center, font=\sffamily\scriptsize},
+    cellExp1/.style={cell, draw=guGreen, fill=guBg!60},
+    cellExp2/.style={cell, draw=violet!70!black, fill=violet!12},
+    cellEmpty/.style={cell, draw=rulegray!40, fill=white,
+                      font=\sffamily\scriptsize\itshape, text=rulegray},
+]
+
+\matrix (m) [matrix of nodes,
+             nodes in empty cells,
+             column sep=0pt, row sep=0pt,
+             nodes={cell, anchor=center}] {
+  |[cellH]|                & |[cellH]|     ideal & |[cellH]|     non\_ideal & |[cellH]|     impatient \\
+  |[cellL]|     unguided / & |[cellExp1]|        & |[cellExp1]|              & |[cellExp2]|           \\
+  |[cellL]|     upfront    & |[cellExp1]| Exp~1  & |[cellExp1]| Exp~1        & |[cellExp2]| Exp~2     \\
+  |[cellL]| guided         & |[cellExp1]| Exp~1  & |[cellExp1]| Exp~1        & |[cellEmpty]| ---      \\
+  |[cellL]| (\texttt{collect\_field}) & & & \\
+  |[cellL]| rigid          & |[cellEmpty]| ---   & |[cellEmpty]| ---         & |[cellExp2]| Exp~2     \\
+  |[cellL]| orchestrator   &                     &                            &                       \\
+  |[cellL]| loose          & |[cellEmpty]| ---   & |[cellEmpty]| ---         & |[cellExp2]| Exp~2     \\
+  |[cellL]| orchestrator   &                     &                            &                       \\
+};
+
+\node[anchor=south, font=\sffamily\bfseries\small, color=rulegray]
+     at (m.north) {Simulator client mode};
+\node[anchor=east, font=\sffamily\bfseries\small, color=rulegray, rotate=90]
+     at ([xshift=-6mm]m.west) {Agent arm};
+
+\node[anchor=north, font=\sffamily\scriptsize\itshape,
+      text width=110mm, align=center, below=4mm of m]
+     {Each covered cell is run at $N=100$ across three personas
+      (\texttt{support\_rambler}, \texttt{support\_billing},
+      \texttt{support\_technical}). Exp~1 covers the form-filling layer
+      (12 covered cells, 1200 runs); Exp~2 covers the orchestration layer
+      under \emph{impatient} client mode (9 covered cells, 900 runs).};
+
+\end{tikzpicture}

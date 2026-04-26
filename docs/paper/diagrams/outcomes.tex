@@ -1,0 +1,53 @@
+% Figure: outcome classification pipeline.
+%
+% Each rollout is sorted into one of four mutually exclusive outcome
+% classes; the metrics reported in the paper are aggregations over those
+% classes. The figure makes both the partitioning and the aggregations
+% explicit so that readers can map any single number in the results
+% section back to a count of rollouts.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    node distance=8mm and 9mm,
+]
+
+% ---- Pipeline ----
+\node[diagBoxT] (run) {Rollout terminates};
+\node[decision, right=of run] (dInfra)
+  {execute() / API\\succeeded?};
+\node[decision, right=of dInfra] (dDone)
+  {reached \texttt{done()}\\legitimately?};
+\node[decision, right=of dDone] (dStrict)
+  {all GT fields\\match exactly?};
+
+\node[outInfra, below=14mm of dInfra]    (oInfra) {\texttt{infra\_error}};
+\node[outIncomplete, below=14mm of dDone] (oInc)   {\texttt{incomplete}};
+\node[outFail, below=14mm of dStrict]    (oCsf)   {\texttt{completed\_strict\_fail}};
+\node[outOk, right=14mm of dStrict]      (oOk)    {\texttt{strict\_ok}};
+
+\draw[flow] (run) -- (dInfra);
+\draw[flow] (dInfra) -- node[edgelbl, left] {no} (oInfra);
+\draw[flow] (dInfra) -- node[edgelbl, above] {yes} (dDone);
+\draw[flow] (dDone)  -- node[edgelbl, left] {no} (oInc);
+\draw[flow] (dDone)  -- node[edgelbl, above] {yes} (dStrict);
+\draw[flow] (dStrict) -- node[edgelbl, left] {no} (oCsf);
+\draw[flow] (dStrict) -- node[edgelbl, above] {yes} (oOk);
+
+% ---- Metric aggregations ----
+\node[metricChip, draw=guGreen, fill=guBg!40,
+      below=18mm of oCsf, anchor=north, text width=42mm] (mStrict)
+   {\textbf{Strict success (ex-infra)}\\$=\,|\texttt{strict\_ok}| / (N - |\texttt{infra\_error}|)$};
+\node[metricChip, draw=oobAmber, fill=oobBg,
+      left=of mStrict, text width=38mm] (mCompl)
+   {\textbf{Completion}\\$=\,(|\texttt{strict\_ok}| + |\texttt{completed\_strict\_fail}|) / N$};
+\node[metricChip, draw=red!60!black, fill=red!10,
+      right=of mStrict, text width=32mm] (mInfra)
+   {\textbf{Infra failure rate}\\$=\,|\texttt{infra\_error}| / N$};
+
+\draw[flowDotted, color=guGreen]   (oOk.south)    .. controls +(0,-1.4) and +(0,1.4) .. (mStrict.north);
+\draw[flowDotted, color=oobAmber]  (oOk.south west) .. controls +(-0.6,-1.6) and +(0.6,1.6) .. (mCompl.north east);
+\draw[flowDotted, color=oobAmber]  (oCsf.south)   .. controls +(0,-1.0) and +(0.4,1.4) .. (mCompl.north);
+\draw[flowDotted, color=red!60!black] (oInfra.south) .. controls +(0,-1.6) and +(-1.6,1.4) .. (mInfra.north west);
+
+\end{tikzpicture}

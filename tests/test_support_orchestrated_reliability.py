@@ -391,9 +391,10 @@ async def test_support_orchestrated_reliability(
         if math.isnan(strict_ex_for_json) or math.isinf(strict_ex_for_json):
             strict_ex_for_json = None
 
-    # Engagement-aware completion: a run is engagement-aware-successful if the
-    # agent did not get hung up AND completed AND strict-passed. (Identical to
-    # strict success on this benchmark, since hung_up implies not completed.)
+    # Engagement-aware completion: rate of runs that did NOT end with the
+    # simulator hanging up. Equal to (1 - hung_up_rate). This metric is the
+    # complement of hung_up_rate; we keep it in the JSON for downstream
+    # tooling, but the paper now reports hung_up_rate directly instead.
     engagement_aware_completion_rate = (
         (RUNS_PER_CASE - hung_up_count) / RUNS_PER_CASE
         if RUNS_PER_CASE

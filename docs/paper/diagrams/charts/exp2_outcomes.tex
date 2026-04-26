@@ -1,0 +1,44 @@
+% Experiment 2 outcome-decomposition stacked bars.
+% One stacked bar per (arm, persona) cell, five segments (matching the
+% extended outcome classification): strict_ok | completed_strict_fail |
+% incomplete | hung_up | infra. Data: diagrams/data/exp2_outcomes.csv.
+
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth, height=72mm,
+    ybar stacked, bar width=12pt,
+    enlarge x limits=0.06,
+    ymin=0, ymax=110,
+    ytick={0,20,40,60,80,100},
+    ylabel={Run count (out of $N=100$)},
+    symbolic x coords={
+      upfront-rambler, upfront-billing, upfront-technical,
+      rigid-rambler,   rigid-billing,   rigid-technical,
+      loose-rambler,   loose-billing,   loose-technical
+    },
+    xtick=data,
+    xticklabel style={rotate=30, anchor=north east, font=\sffamily\scriptsize},
+    yticklabel style={font=\sffamily\scriptsize},
+    legend style={
+      at={(0.5,-0.32)}, anchor=north, legend columns=5,
+      font=\sffamily\scriptsize, draw=rulegray, fill=white,
+      /tikz/every even column/.append style={column sep=4pt},
+    },
+    every axis plot/.append style={fill opacity=0.85, draw opacity=0.9},
+    grid=major, grid style={dashed, gray!30},
+]
+
+\addplot+[fill=guGreen, draw=guGreen]
+  table[col sep=space, x=cell, y=strict_ok] {diagrams/data/exp2_outcomes.csv};
+\addplot+[fill=oobAmber, draw=oobAmber]
+  table[col sep=space, x=cell, y=completed_strict_fail] {diagrams/data/exp2_outcomes.csv};
+\addplot+[fill=ungOrange, draw=ungOrange]
+  table[col sep=space, x=cell, y=incomplete] {diagrams/data/exp2_outcomes.csv};
+\addplot+[fill=violet!70!black, draw=violet!70!black]
+  table[col sep=space, x=cell, y=hung_up] {diagrams/data/exp2_outcomes.csv};
+\addplot+[fill=red!65!black, draw=red!65!black]
+  table[col sep=space, x=cell, y=infra_error] {diagrams/data/exp2_outcomes.csv};
+
+\legend{strict\_ok, completed\_strict\_fail, incomplete, hung\_up, infra\_error}
+\end{axis}
+\end{tikzpicture}

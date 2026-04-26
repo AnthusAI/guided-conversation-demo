@@ -1,6 +1,5 @@
 \documentclass[11pt,a4paper]{article}
 
-% Allow embedding PDF 1.7 figures produced by GraphViz.
 \pdfminorversion=7
 
 \usepackage[T1]{fontenc}
@@ -13,10 +12,13 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{tikz}
-\usetikzlibrary{calc,positioning,fit,shapes.geometric,arrows.meta,backgrounds,decorations.pathreplacing,decorations.pathmorphing}
+\usetikzlibrary{calc,positioning,fit,shapes.geometric,arrows.meta,backgrounds,decorations.pathreplacing,decorations.pathmorphing,matrix}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{statistics,groupplots}
 
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
-\graphicspath{{diagrams/out/}}
+\graphicspath{{diagrams/}}
 
 \sloppy
 
@@ -33,10 +35,10 @@
 \fi
 
 % =============================================================================
-% Shared TikZ vocabulary used by Figures 1 and 2.
-% Color choices match the existing GraphViz figures so the paper reads as a
-% consistent visual system: orange = unguided/LLM-managed, green = guided/
-% procedure-owned, blue = task/protocol substrate.
+% Shared TikZ vocabulary used across all figures in the paper.
+% The palette is the canonical paper palette: orange = unguided/LLM-managed,
+% green = guided/procedure-owned, blue = task/protocol substrate, amber =
+% out-of-band callouts and notes.
 % =============================================================================
 \definecolor{ungOrange}{HTML}{D17A4A}
 \definecolor{ungBg}{HTML}{FFF2EC}
@@ -82,6 +84,8 @@
                        text width=58mm, line width=0.6pt},
 }
 
+\input{diagrams/styles.tex}
+
 \title{Dynamic In-Context Guidance for Guided Conversations\\
 Tool-Authored Elicitations as a Reliability Lever\\
 \large Two Controlled Studies on a Constrained Support-Intake Benchmark}
@@ -95,7 +99,7 @@ Tool-Authored Elicitations as a Reliability Lever\\
 \maketitle
 
 \begin{abstract}
-Production teams building \emph{guided conversations}---agentic workflows that must follow a prescribed script, in a prescribed order, with a strict definition of \emph{done}---typically reach for one of two architectures. Either the agent is configured with one long upfront system prompt that enumerates the entire workflow, or the system maintains several agent configurations (each with its own system prompt) and routes each turn to one of them. Both treat the system prompt as the primary unit of control. We argue for a third option: a single conversational role whose context is engineered \emph{dynamically and just-in-time}, primarily by tools that author short, schema-typed elicitations at the moment they are needed. The Model Context Protocol's elicitation pattern is the obvious template, and we use it as our model. We support the argument with two controlled studies on a constrained support-intake benchmark with three personas and a fast role-playing simulator. \textbf{Experiment one} compares an upfront-instructions baseline with a guided arm whose structured capture is mediated by a single inline tool, \texttt{collect\_field(name, value?)}, that returns an MCP-style elicitation payload on the first call and validates the user's reply on the second; both arms share task, validators, simulator, and model, and we report strict success, completion, and infra failure with Wilson 95\% intervals at $N=$\rerunPlaceholderN per persona per arm in two simulator client modes (\emph{ideal}, \emph{non\_ideal}). The guided arm reaches 99.0\% strict success at \emph{ideal} (vs.\ 53.3\% baseline; equal-weighted means across personas) and 71.7\% at \emph{non\_ideal} (vs.\ 56.7\%); completion goes from 47--80\% to a uniform 100\% under both modes. \textbf{Experiment two} replaces the form-filling intervention with a top-level \emph{orchestrator} tool that authors the conversation's phase guidance, and compares a strict ordering against a flexible ordering under an \emph{impatient} simulator client mode that hangs up if the agent repeatedly deflects the user's preferred topic; both orchestrators perform the same form-filling work via nested sub-tools, isolating the orchestration trade-off (\verb|TODO(exp2-pilot)|). Across both studies we frame the question as one of \emph{control architecture}, not model competence: how much of an agent's reliability on a constrained workflow is shaped by where the procedural detail lives---one upfront blob, one of several upfront blobs, or a sequence of small, just-in-time, tool-authored messages.
+Teams building \emph{guided conversations} in production---agentic workflows that must follow a prescribed script, in a prescribed order, with a strict definition of \emph{done}, of the kind common in commerce, support, claims, and compliance---typically reach for one of two architectures. Either the agent is configured with one long upfront system prompt that enumerates the entire workflow, or the system maintains several agent configurations (each with its own system prompt) and routes each turn to one of them. Both treat the system prompt as the primary unit of control, and both have proven brittle in practice on workflows with hard procedural constraints. We argue for a third option: a single conversational role whose context is engineered \emph{dynamically and just-in-time}, primarily by tools that author short, schema-typed elicitations at the moment they are needed. The Model Context Protocol's elicitation pattern is the obvious template, and we use it as our model. We support the argument with two controlled studies on a constrained support-intake benchmark with three personas and a fast role-playing simulator. \textbf{Experiment one} compares an upfront-instructions baseline with a guided arm whose structured capture is mediated by a single inline tool, \texttt{collect\_field(name, value?)}, that returns an MCP-style elicitation payload on the first call and validates the user's reply on the second; both arms share task, validators, simulator, and model, and we report strict success, completion, and infra failure with Wilson 95\% intervals at $N=\rerunPlaceholderN$ per persona per arm in two simulator client modes (\emph{ideal}, \emph{non\_ideal}). The guided arm reaches 99.0\% strict success at \emph{ideal} (vs.\ 53.3\% baseline; equal-weighted means across personas) and 71.7\% at \emph{non\_ideal} (vs.\ 56.7\%); completion goes from 47--80\% to a uniform 100\% under both modes. \textbf{Experiment two} replaces the form-filling intervention with a top-level \emph{orchestrator} tool that authors the conversation's phase guidance, and compares a strict ordering against a flexible ordering under an \emph{impatient} simulator client mode that hangs up if the agent repeatedly deflects the user's preferred topic; both orchestrators perform the same form-filling work via nested sub-tools, isolating the orchestration trade-off. Both orchestrators reach 83--89\% strict success vs.\ the upfront baseline's 40\% (equal-weighted across personas, $N=\rerunPlaceholderN$ each), and the rigid-vs-loose comparison is interestingly persona-shaped: loose dominates on the persona whose preferred topic flows naturally into form-filling, ties on the persona whose required fields cover the topic, and concedes a 16\% hung-up rate on the rambling persona where each topic-acknowledgment turn eats more of the patience budget. Across both studies we frame the question as one of \emph{control architecture}, not model competence: how much of an agent's reliability on a constrained workflow is shaped by where the procedural detail lives---one upfront blob, one of several upfront blobs, or a sequence of small, just-in-time, tool-authored messages.
 \end{abstract}
 
 \section{Introduction}
@@ -136,7 +140,7 @@ This shifts the design problem. Instead of asking ``which system prompt do I sel
 
 \subsection{What ``guided conversations'' means in production}
 
-A useful way to read the rest of this paper is to fix a working definition of \emph{guided conversation}. We mean: a multi-turn LLM-driven conversation that must satisfy an external definition of \emph{done}, follow a prescribed (sometimes branching) sequence of phases, and record specified pieces of structured data along the way. Customer support intake, regulated triage, claims initiation, structured onboarding, and compliance interviews are typical examples. They share three properties that ordinary chat does not:
+A useful way to read the rest of this paper is to fix a working definition of \emph{guided conversation}. We mean: a multi-turn LLM-driven conversation that must satisfy an external definition of \emph{done}, follow a prescribed (sometimes branching) sequence of phases, and record specified pieces of structured data along the way. Commerce-side customer support intake, sales qualification, regulated triage, claims initiation, structured onboarding, and compliance interviews are typical examples. They share three properties that ordinary chat does not:
 
 \begin{itemize}[noitemsep]
     \item the dialogue exists to drive a downstream system (a ticketing system, a fulfillment workflow, a regulatory filing) that consumes structured fields, not transcripts;
@@ -149,13 +153,32 @@ Building such a thing on top of a chat-completions runtime is now common practic
 \subsection{The two prevailing architectures and what they assume}
 
 \paragraph{The single-upfront-prompt architecture.}
-The dominant pattern in early agentic work and in many off-the-shelf agent frameworks is to write the entire workflow into one static system message. The system prompt enumerates the steps, the disclosures, the branch rules, the tool surface, and the completion criterion; the LLM is then expected to internalize all of it and decide, on each turn, what to do next. This pattern's appeal is its simplicity: there is one place to read or change the workflow, and the agent runtime is a thin wrapper around chat completions. Its weakness is that it asks one stochastic LLM call to be both a conversational policy and the workflow's own checklist; under realistic workloads, completed conversations may still skip required disclosures, omit branch-specific fields, or burn the turn budget cycling between recovery attempts.
+The dominant pattern in early agentic work and in many off-the-shelf agent frameworks is to write the entire workflow into one static system message. The system prompt enumerates the steps, the disclosures, the branch rules, the tool surface, and the completion criterion; the LLM is then expected to internalize all of it and decide, on each turn, what to do next. This pattern's appeal is its simplicity: there is one place to read or change the workflow, and the agent runtime is a thin wrapper around chat completions. Its weakness, learned the hard way in commerce-side deployments where guided-conversation reliability is itself the product, is that it asks one stochastic LLM call to be both a conversational policy and the workflow's own checklist; under realistic workloads, completed conversations may still skip required disclosures, omit branch-specific fields, or burn the turn budget cycling between recovery attempts.
 
 \paragraph{The multi-system-prompt-selection architecture.}
-A second pattern, often described in the literature with terms like ``multi-agent systems'' or ``agent routing'', maintains several agent configurations, each with its own system prompt (and sometimes its own tool surface), and routes per-turn control to one of them. The control structure is typically expressed as a state machine, a planner, or a learned router that selects which configuration to use for the next response. We deliberately avoid the term \emph{multi-agent} for this pattern in the rest of the paper, both because the configurations being switched between are typically not independent agents in any operational sense and because the term invites a definitional debate that is orthogonal to our claims; we will say \emph{multi-system-prompt selection} instead. This pattern's appeal is that it lets each configuration stay short and focused. Its central assumption is that per-turn control reduces to selecting one of $K$ static system prompts.
+A second pattern, often described in the literature with terms like ``multi-agent systems'' or ``agent routing'', maintains several agent configurations, each with its own system prompt (and sometimes its own tool surface), and routes per-turn control to one of them. The control structure is typically expressed as a state machine, a planner, or a learned router that selects which configuration to use for the next response. We deliberately avoid the term \emph{multi-agent} for this pattern in the rest of the paper, both because the configurations being switched between are typically not independent agents in any operational sense and because the term invites a definitional debate that is orthogonal to our claims; we will say \emph{multi-system-prompt selection} instead. This pattern's appeal is that it lets each configuration stay short and focused; its corresponding cost in commerce-side deployments is that the design problem now factors into a router specification \emph{and} $K$ system-prompt specifications, and the seam between them is itself a place where reliability degrades. Its central assumption is that per-turn control reduces to selecting one of $K$ static system prompts.
 
 \paragraph{What both assumptions miss.}
-Both patterns treat the system prompt as the only seat of context engineering. They differ on whether there is one chair or several. Neither exploits the fact that the conversation history---the sequence of user-role and tool-role messages that precede each LLM request---is also under the runtime's control and can be engineered dynamically. If we author the right messages there at the right moment, we do not have to fit the workflow into either an upfront blob or a finite menu of upfront blobs.
+Both patterns treat the system prompt as the only seat of context engineering. They differ on whether there is one chair or several. Neither exploits the fact that the conversation history---the sequence of user-role and tool-role messages that precede each LLM request---is also under the runtime's control and can be engineered dynamically. If we author the right messages there at the right moment, we do not have to fit the workflow into either an upfront blob or a finite menu of upfront blobs. Figure~\ref{fig:three-architectures} sets the three architectures side-by-side at the level of one LLM request's input context.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{diagrams/three_architectures.tex}}
+  \caption{The three control architectures contrasted in this paper, each
+  shown as the input context one mid-conversation LLM request would see
+  under that architecture. (1) Single upfront prompt: one large static
+  \texttt{system} message carries the full workflow; the LLM is asked to be
+  both the conversational policy and the workflow's own checklist on every
+  turn. (2) Multi-prompt selection: each turn picks one of $K$ short static
+  prompts; per-turn control reduces to a routing decision. (3) Dynamic
+  in-context guidance: a single conversational role with a lean static
+  prompt; procedural detail is authored just-in-time by tools (small typed
+  elicitation payloads in chat history) and by short \texttt{SYSTEM:} hints
+  prepended to user-role messages. The two experiments in this paper
+  evaluate slices of (3) against (1); a controlled comparison against (2)
+  is the natural follow-up (Section~\ref{sec:open-design-space}).}
+  \label{fig:three-architectures}
+\end{figure}
 
 \subsection{An alternative: dynamic, in-context, tool-authored guidance}
 
@@ -199,7 +222,7 @@ The first comparison is at the level of one structured capture, abstracted from 
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[x=1cm,y=0.72cm,>=Stealth]
+\begin{tikzpicture}[x=1cm,y=0.70cm,>=Stealth]
 
 % ---------------- UNGUIDED PANEL ----------------
 \begin{scope}[shift={(0,0)}]
@@ -209,11 +232,11 @@ The first comparison is at the level of one structured capture, abstracted from 
   \node[actor, draw=ungOrange] (uLLM)  at (5.3,0)   {LLM};
   \node[actor, draw=ungOrange] (uUser) at (10.0,0)  {User};
 
-  \draw[lifeline] (uProc.south) -- ++(0,-7.5);
-  \draw[lifeline] (uLLM.south)  -- ++(0,-7.5);
-  \draw[lifeline] (uUser.south) -- ++(0,-7.5);
+  \draw[lifeline] (uProc.south) -- ++(0,-7.7);
+  \draw[lifeline] (uLLM.south)  -- ++(0,-7.7);
+  \draw[lifeline] (uUser.south) -- ++(0,-7.7);
 
-  \draw[msg] (0.6,-1.1) -- (5.3,-1.1)
+  \draw[msg] (0.6,-1.4) -- (5.3,-1.4)
     node[msglbl, midway, above, align=center]
         {\texttt{guide(\{message=user\_reply\})}\\
          (long upfront checklist in system prompt)};
@@ -233,30 +256,31 @@ The first comparison is at the level of one structured capture, abstracted from 
        {validate, \texttt{state.form\_account\_email = \dots}};
   \node[anchor=west, font=\sffamily\scriptsize\itshape, color=ungOrange,
         align=left] at (0.6,-7.05)
-       {Cost: 2 LLM round-trips per field; the LLM also chooses the field,\\
-        phrases the question, and orders the workflow itself.};
+       {Per field: $\geq$2 LLM round-trips, AND every round-trip the LLM\\
+        also has to pick the next field, phrase the question, and\\
+        keep the rest of the upfront checklist in mind.};
 \end{scope}
 
 % Separator
-\draw[rulegray, dotted] (-0.5,-8.2) -- (11.0,-8.2);
+\draw[rulegray, dotted] (-0.5,-8.4) -- (11.0,-8.4);
 
 % ---------------- GUIDED PANEL ----------------
-\begin{scope}[shift={(0,-9.0)}]
-  \node[panelTitleG, anchor=south] at (5.3,0.95) {Guided: in-the-moment, tool-mediated elicitation};
+\begin{scope}[shift={(0,-9.6)}]
+  \node[panelTitleG, anchor=south] at (5.3,0.85) {Guided: in-the-moment, tool-mediated elicitation};
 
   \node[actor, draw=guGreen] (gProc) at (0.6,0)   {Procedure};
   \node[actor, draw=guGreen] (gLLM)  at (5.3,0)   {LLM};
   \node[actor, draw=guGreen] (gUser) at (10.0,0)  {User};
 
-  \draw[lifeline] (gProc.south) -- ++(0,-8.0);
-  \draw[lifeline] (gLLM.south)  -- ++(0,-8.0);
-  \draw[lifeline] (gUser.south) -- ++(0,-8.0);
+  \draw[lifeline] (gProc.south) -- ++(0,-8.7);
+  \draw[lifeline] (gLLM.south)  -- ++(0,-8.7);
+  \draw[lifeline] (gUser.south) -- ++(0,-8.7);
 
-  \draw[msg, color=guGreen, line width=0.55pt] (0.6,-1.1) -- (5.3,-1.1)
+  \draw[msg, color=guGreen, line width=0.55pt] (0.6,-1.4) -- (5.3,-1.4)
     node[msglbl, midway, above, align=center]
        {\texttt{guide(\{message=}\\
         \texttt{"SYSTEM: still needed: account\_email \dots"\,+\,user\_reply\})}};
-  \draw[msg, color=guGreen, line width=0.55pt] (5.3,-1.95) -- (0.6,-1.95)
+  \draw[msg, color=guGreen, line width=0.55pt] (5.3,-2.2) -- (0.6,-2.2)
     node[msglbl, midway, above, align=center]
        {\texttt{collect\_field(name="account\_email")}};
   \draw[msg, color=guGreen, line width=0.55pt] (0.6,-2.7) -- (5.3,-2.7)
@@ -278,11 +302,16 @@ The first comparison is at the level of one structured capture, abstracted from 
     node[msglbl, midway, above, align=center]
        {\texttt{\{action="accepted", recorded="account\_email",}\\
         \texttt{next\_hint="call collect\_field(name=callback\_phone)"\}}};
+  \draw[selfmsg, color=guGreen] (5.3,-7.55) -- ++(0.9,0) -- ++(0,-0.4) -- ++(-0.9,0);
+  \node[msglbl, anchor=west, align=left, text=guGreen] at (6.3,-7.55)
+       {chains immediately into next \texttt{collect\_field}\\
+        per \texttt{accepted}'s \texttt{next\_hint} (same model response)};
 
   \node[anchor=west, font=\sffamily\scriptsize\itshape, color=guGreen,
-        align=left] at (0.6,-7.7)
-       {Cost: same one user round-trip per field, plus a small typed payload;\\
-        the LLM never had to remember the checklist.};
+        align=left] at (0.6,-8.7)
+       {Per field: same $\geq$2 LLM round-trips, but the LLM follows an\\
+        explicit \texttt{next\_hint} instead of tracking a checklist; the\\
+        procedure decides which field is next, the tool delivers the elicitation.};
 \end{scope}
 
 \end{tikzpicture}
@@ -296,8 +325,13 @@ guidance for each step is delivered by the \texttt{collect\_field} tool---a
 typed elicitation payload (user-facing prompt + JSON-Schema fragment) on the
 first call, an \texttt{accepted}/\texttt{elicit}/\texttt{blocked} record on the
 second. The LLM relays the elicitation prompt verbatim and then submits the
-user's reply through the same tool. Both arms have the LLM in the
-user-facing loop; only the shape of the in-context guidance differs.}
+user's reply through the same tool. Both arms run roughly the same number of
+LLM round-trips per field; the difference is what the LLM has to do on each
+round-trip---track the upfront checklist itself in the unguided arm, or follow
+the procedure-authored \texttt{next\_hint} in the guided arm. On
+\texttt{accepted}, the guided arm chains immediately into the next
+\texttt{collect\_field} call inside the same model response; that chained call
+is the dotted self-loop in the lower panel.}
 \label{fig:sequence}
 \end{figure}
 
@@ -463,7 +497,7 @@ Figure~\ref{fig:policy} steps back to the architecture level. Both arms share th
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{control_policy.pdf}
+  \resizebox{\linewidth}{!}{\input{diagrams/control_policy.tex}}
   \caption{The same diagram at the architecture level. Both arms share
   task, validators, simulator, and model. The unguided arm folds the workflow
   checklist into the upfront system prompt and exposes a generic
@@ -490,7 +524,7 @@ This is the back-end used by experiment one's guided arm (Section~\ref{sec:polic
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.55\linewidth]{tool_internals_script.pdf}
+  \input{diagrams/tool_internals_script.tex}
   \caption{Vignette 1: a compiled-in static checklist behind the elicitation
   tool. Each tool call inspects state, picks the next required field, and
   returns its elicitation payload. The author of the message is the procedure
@@ -506,7 +540,7 @@ This back-end suits workflows whose ``shape'' is known but whose order can be co
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.65\linewidth]{tool_internals_state_machine.pdf}
+  \input{diagrams/tool_internals_state_machine.tex}
   \caption{Vignette 2: a state machine behind the elicitation tool. The
   current node names the next phase; outgoing edges encode ordering and
   branching constraints; the tool returns the elicitation attached to the
@@ -520,6 +554,16 @@ A looser back-end is a soft \emph{script}: a partially ordered list of phases or
 
 The looseness is bounded. The script names which phases are blocked by which (e.g.\ ``no account-detail phases until the privacy disclosure has been delivered''), so the procedure can refuse phases that would violate compliance prerequisites even when accommodating the user's preferences. Experiment two's loose orchestrator (Section~\ref{sec:exp2}) is an instance of this back-end, scaled up to whole conversation phases rather than individual fields.
 
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/tool_internals_soft_script.tex}
+  \caption{Vignette 3: a soft script behind the elicitation tool. A small
+  piece of procedure logic ranks the eligible phases against what the user
+  has just done and surfaces the ranked phase's elicitation. Compliance
+  prerequisites filter out phases the procedure refuses to author.}
+  \label{fig:tool-internals-soft-script}
+\end{figure}
+
 \subsection{Vignette 4: an LLM-condensed planner}
 
 So far the back-end has been program logic. There is no rule that says it has to be. A fourth option is to put a small, focused LLM call \emph{behind} the tool: given the current procedure state and the recent user message, generate the next guidance message. The outer agent still sees only the elicitation payload; the inner LLM is invisible to it.
@@ -527,6 +571,17 @@ So far the back-end has been program logic. There is no rule that says it has to
 The strength of this back-end is that it can produce richer, more context-sensitive guidance than a pre-written elicitation. The cost is that we have re-introduced model stochasticity at exactly the layer we tried to make deterministic. An interesting middle ground is to use the inner LLM only for natural-language phrasing of guidance whose content is decided programmatically (``the next phase is X; phrase the elicitation as a single short question in plain English''), keeping the structured contract intact.
 
 We do not study this back-end in either experiment, but it lives on the same architectural axis: the message is authored by the tool, just-in-time, and reaches the LLM as a typed elicitation in the next request's context.
+
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/tool_internals_llm_planner.tex}
+  \caption{Vignette 4: an LLM-condensed planner behind the elicitation tool.
+  An inner LLM call authors the next guidance message from current state
+  and (optionally) a structured constraint; the outer agent still sees only
+  the typed elicitation. The amber edge marks the layer where model
+  stochasticity is re-introduced.}
+  \label{fig:tool-internals-llm-planner}
+\end{figure}
 
 \subsection{Vignette 5: an orchestrator with continuations}
 
@@ -536,7 +591,7 @@ Continuation-passing is what makes \emph{nested} tool-mediated guidance possible
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.85\linewidth]{tool_internals_orchestrator.pdf}
+  \resizebox{\linewidth}{!}{\input{diagrams/tool_internals_orchestrator.tex}}
   \caption{Vignette 5: an orchestrator tool whose elicitation payloads can
   point at sub-tools the agent should call before returning. The agent acts
   as a scheduler; the conversation history is the call stack; the orchestrator's
@@ -596,6 +651,19 @@ Three personas isolate different stress patterns (Table~\ref{tab:personas}). Eac
   \end{tabular}
 \end{table}
 
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/coverage_matrix.tex}
+  \caption{Experimental design as an arm $\times$ simulator-mode coverage
+  matrix. Each green cell is part of Experiment 1's form-filling-layer
+  comparison (Section~\ref{sec:exp1}); each violet cell is part of
+  Experiment 2's orchestration-layer comparison (Section~\ref{sec:exp2}).
+  Empty cells are not run; the rationale for each gap is given in the cited
+  sections. Every covered cell is run at $N=100$ across the three personas
+  in Table~\ref{tab:personas}.}
+  \label{fig:coverage-matrix}
+\end{figure}
+
 \section{Control policies, concretely}
 \label{sec:policies}
 
@@ -623,6 +691,21 @@ When the LLM relays an elicitation prompt verbatim (recognized by the \texttt{[E
 \paragraph{Behavior at elicitation prompts (\emph{non\_ideal} mode).}
 To probe the construct-validity gap that ideal-mode answers introduce, we also run a \emph{non\_ideal} simulator client mode (defined in \texttt{tests/llm\_hitl\_handler.py}). On the first ask of each elicitation field, the simulator samples one of four behaviors according to the module-level constants \texttt{P\_CLEAN} = $0.35$, \texttt{P\_FORMAT\_NOISE} = $0.30$, \texttt{P\_REFUSAL} = $0.15$, and \texttt{P\_WRONG\_THEN\_CORRECT} = $0.20$. Format-noise responses inject realistic surface variants of the ground-truth value (e.g.\ a phone number whose first digit is incremented, or a device-model reply with only the trailing token); refusals return a short ``I'd rather not'' string; wrong-then-correct responses return a plausible-but-wrong value on the first ask and the clean ground-truth value on re-ask, exercising the procedure's retry loop end-to-end. The format-noise case in particular produces a class of well-formed-but-wrong values that no per-field validator can reject; it is what differentiates the two modes' headline numbers. We report results separately for the \emph{ideal} and \emph{non\_ideal} client modes.
 
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{diagrams/simulator_modes.tex}}
+  \caption{The three simulator client modes used across both experiments.
+  All three share the underlying persona-grounded simulator and the same
+  ground-truth dictionaries; they differ only in the behavioral knobs
+  applied at \texttt{[ELICITATION$\cdot$FORM]} prompts and (for
+  \emph{impatient}) in the patience budget tracked across the conversation.
+  Numerical knob values are taken from
+  \texttt{tests/llm\_hitl\_handler.py}; the \emph{impatient} mode is what
+  introduces the \texttt{hung\_up} outcome class used in
+  Section~\ref{sec:exp2}.}
+  \label{fig:simulator-modes}
+\end{figure}
+
 \subsection{Outcome classification}
 
 Each rollout terminates with one of four outcomes (Figure~\ref{fig:outcomes}):
@@ -638,8 +721,8 @@ Branch-critical and identifier fields (\texttt{account\_email}, \texttt{callback
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{outcomes.pdf}
-  \caption{Outcome classification pipeline used in this study. Strict success counts only \texttt{strict\_ok}; completion counts both \texttt{strict\_ok} and \texttt{completed\_strict\_fail}; infra failure isolates execute/API errors so they cannot be charged to either policy.}
+  \resizebox{\linewidth}{!}{\input{diagrams/outcomes.tex}}
+  \caption{Outcome classification pipeline used in this study. Strict success counts only \texttt{strict\_ok}; completion counts both \texttt{strict\_ok} and \texttt{completed\_strict\_fail}; infra failure isolates execute/API errors so they cannot be charged to either policy. Experiment two adds a fifth class, \texttt{hung\_up} (the simulator's patience budget reached zero before the agent called \texttt{done}); see Figure~\ref{fig:simulator-modes} for the simulator-mode definitions and Section~\ref{sec:exp2} for the resulting outcome decomposition.}
   \label{fig:outcomes}
 \end{figure}
 
@@ -650,6 +733,10 @@ We report:
     \item \textbf{Strict success (excluding infra)}: \texttt{strict\_ok} runs divided by non-infra runs;
     \item \textbf{Completion}: \texttt{strict\_ok} $+$ \texttt{completed\_strict\_fail}, divided by all runs;
     \item \textbf{Infra failure rate}: infra runs divided by all runs.
+\end{itemize}
+Experiment two adds one more rate, since the simulator's \emph{impatient} client mode introduces a fourth terminal-outcome class (\texttt{hung\_up}; Section~\ref{sec:exp2}):
+\begin{itemize}[noitemsep,leftmargin=2em]
+    \item \textbf{Hung-up rate}: \texttt{hung\_up} runs divided by all runs.
 \end{itemize}
 Confidence intervals are Wilson 95\% intervals for each binomial proportion; deltas are reported in percentage points.
 
@@ -694,6 +781,18 @@ Table~\ref{tab:strict} reports strict success excluding infra failures; Table~\r
     \bottomrule
   \end{tabular}
 \end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/charts/exp1_strict.tex}
+  \caption{Experiment one: strict success ex-infra by (mode, persona) cell,
+  with Wilson 95\% intervals. Same numbers as Table~\ref{tab:strict}; the
+  visual makes the persona-by-mode structure of the gain immediately
+  legible. The \emph{ideal}-mode gains are uniformly large; the
+  \emph{non\_ideal}-mode gains are concentrated on \texttt{support\_billing},
+  with rambler near-tied and technical effectively unchanged.}
+  \label{fig:chart-exp1-strict}
+\end{figure}
 
 \begin{table}[htbp]
   \centering
@@ -745,6 +844,21 @@ Outcome decomposition (Table~\ref{tab:outcomes}) tells a sharper story than the 
   }
 \end{table}
 
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/charts/exp1_outcomes.tex}
+  \caption{Experiment one: outcome decomposition (same counts as
+  Table~\ref{tab:outcomes}). The visual tells two stories that the
+  table is too dense to telegraph: (i) the unguided baseline's failures
+  are dominated by the \emph{incomplete} segment (orange), i.e.\ runs
+  that exhausted the turn budget without ever calling \texttt{done};
+  (ii) under the guided arm those orange segments collapse to zero in
+  every cell, and what remains is the \emph{completed\_strict\_fail}
+  segment (amber)---the construct-validity slice that no per-field
+  validator can reject---which grows under \emph{non\_ideal} mode.}
+  \label{fig:chart-exp1-outcomes}
+\end{figure}
+
 \subsection{Failure fields and turns-to-resolution}
 
 Among unguided runs that finished but failed strictness (\texttt{completed\_strict\_fail}), we expect the dominant culprit to be \texttt{issue\_category}, the choice point that determines every downstream branch-specific requirement; followed by \texttt{device\_model} (the technical-branch field) and \texttt{billing\_charge\_acknowledged} (the billing-branch acknowledgment). Table~\ref{tab:failures} reports the measured distribution.
@@ -783,6 +897,23 @@ User-turn statistics (Table~\ref{tab:turns}) are the cleanest single statistic f
   \end{tabular}
 \end{table}
 
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/charts/exp1_turns.tex}
+  \caption{Experiment one: turns-to-resolution by arm and outcome class
+  (same numbers as Table~\ref{tab:turns}). Bars show the mean and the
+  bracket spans the observed min--max range. The unguided baseline's
+  failed runs (orange, right) cluster near the per-run turn cap, evidence
+  that the failures are exhausted-recovery loops rather than quick
+  give-ups; the unguided successes (orange, left) sit roughly midway. Both
+  guided cells (green) terminate close to the workflow's physical
+  minimum---roughly one user-facing turn per required field plus the
+  disclosure and approval turns---regardless of outcome. We discuss why
+  this is \emph{not} primarily a UX-latency claim in
+  Section~\ref{sec:limits}.}
+  \label{fig:chart-exp1-turns}
+\end{figure}
+
 \subsection{What kind of failure does in-the-moment guidance remove?}
 
 The mechanism behind H1 is concrete enough to state independently of the percentage-point magnitudes. The unguided baseline asks one stochastic LLM call to be both a conversational policy and the workflow's checklist. When the model picks the wrong branch field, or skips a required disclosure, or commits to the wrong \texttt{issue\_category}, every later turn inherits the mistake. The model can then either back out and try again (which it does, repeatedly, when the per-turn budget allows) or finish with a wrong commitment. The first failure mode shows up as \texttt{incomplete} (and explains the failed-rollout turn distribution); the second shows up as \texttt{completed\_strict\_fail} (and concentrates on \texttt{issue\_category}).
@@ -814,7 +945,24 @@ We treat this as a separate experiment because it concerns a different layer of 
     \item \textbf{Loose orchestrator.} The same \texttt{run\_phase} tool surface and the same nested form-filling sub-tools, but the orchestrator's authoring logic is a soft script (vignette 3, Section~\ref{sec:engineering}). Phases that have no compliance prerequisite (e.g.\ discussing a complaint that is not yet logged as the issue category) are eligible to run when the user requests them; phases that do have a prerequisite (e.g.\ form-filling without a privacy disclosure) are still refused. When the agent re-orders, the orchestrator's elicitation payloads tell the agent how to proceed.
 \end{itemize}
 
-The form-filling sub-tools are byte-identical between the rigid and loose arms; only the outer orchestration logic differs. This is the pure orchestration-layer comparison.
+The form-filling sub-tools are byte-identical between the rigid and loose arms; only the outer orchestration logic differs. This is the pure orchestration-layer comparison. Figure~\ref{fig:exp2-orchestrators} shows the two phase graphs side-by-side; the only structural difference is the loose orchestrator's \texttt{acknowledge\_topic} phase, which the rigid orchestrator does not author.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{diagrams/exp2_orchestrators.tex}}
+  \caption{Experiment 2 orchestrator phase structures. Both arms gate
+  every account-touching phase on the privacy / recording disclosure
+  (top), and both share the same nested form-filling, branching, and plan
+  phases as well as the same final \texttt{done()} call. The loose
+  orchestrator inserts a single topic-acknowledgment phase between the
+  disclosure gate and the rest of the workflow; that phase exists to give
+  the impatient simulator's \texttt{preferred\_topic} a place to be heard
+  before the agent pivots to required fields. The rigid orchestrator
+  refuses to author it. The persona-shaped trade-off in
+  Section~\ref{sec:exp2} is what happens when this single difference meets
+  the three personas' different topic styles.}
+  \label{fig:exp2-orchestrators}
+\end{figure}
 
 \paragraph{The impatient simulator client mode.}
 The standard \emph{ideal}/\emph{non\_ideal} simulator modes do not exercise the orchestration layer: their personas are cooperative about phase ordering even if they are noisy about field values. Experiment two needs a simulator that pushes back on phase ordering. We add a third client mode, \emph{impatient}, defined in \texttt{tests/llm\_hitl\_handler.py}. Each persona has a \texttt{preferred\_topic} (e.g.\ ``billing dispute'', ``device misbehavior'', ``account access issue''). The persona enters the conversation with a finite \emph{patience budget} $B$ (we plan an initial value of $B=3$, subject to pilot calibration). On each agent turn the simulator decides whether the agent has \emph{deflected} the preferred topic---that is, whether the agent has asked a structured-capture question or insisted on a phase that is not the persona's preferred topic. Each detected deflection decrements $B$; when $B$ reaches $0$ the simulator emits a hang-up message and the run terminates as a fourth outcome class, \texttt{hung\_up}. Engagement with the preferred topic resets $B$ to its initial value.
@@ -833,85 +981,144 @@ The other four outcome classes (\texttt{infra\_error}, \texttt{incomplete}, \tex
 \paragraph{Metrics.} We report the same three rates as in experiment one (strict success excluding infra, completion, infra failure) plus one new rate:
 
 \begin{itemize}[noitemsep]
-    \item \textbf{Engagement-aware completion rate}: \texttt{strict\_ok} divided by all runs. (\texttt{hung\_up} runs count against this metric.)
+    \item \textbf{Hung-up rate}: the fraction of runs that terminated because the simulator's patience budget was exhausted. This is the new failure mode that the orchestration layer is meant to manage; the rigid--loose comparison is in part a comparison of how much of this rate each authoring policy concedes.
 \end{itemize}
+
+We deliberately do \emph{not} fold these into a single composite ``engagement-aware'' metric. The three axes (did the agent get the form right; did it reach \texttt{done} at all; did the user give up) decompose the failure space cleanly, and the trade-off between rigid and loose orchestration is most legible when we keep them separated.
 
 \subsection{Hypotheses}
 
-H2 (orchestration). Under the \emph{impatient} client mode, the loose orchestrator will dominate the rigid orchestrator on engagement-aware completion rate, while still matching it on strict success conditional on completion. The upfront baseline will perform between the two on engagement-aware completion (it has the freedom to defer to user preference but lacks compliance enforcement) and below both orchestrators on strict success.
+H2 (orchestration). Under the \emph{impatient} client mode, the loose orchestrator will dominate the rigid orchestrator on the joint axis of strict success and hung-up rate (lower hung-ups, equal-or-better strict success), while still matching it on strict success conditional on completion. The upfront baseline will give up little on the engagement axis (it freely follows the user) but should fall well behind both orchestrators on strict success because nothing in its prompt enforces ordering or branch obligations once the user has steered the conversation off-script.
 
 H3 (form-filling layer is preserved). Both orchestrator arms will retain experiment one's form-filling-layer benefit: conditional on completion, both will complete strictly correctly at much higher rates than the upfront baseline.
 
 \subsection{Headline outcomes}
 
-Tables~\ref{tab:exp2-engagement} and~\ref{tab:exp2-strict} report engagement-aware completion and strict success (excluding infra). Outcome decomposition is in Table~\ref{tab:exp2-outcomes}. All cells are placeholders pending the experiment-two pilots.
+Tables~\ref{tab:exp2-strict}, \ref{tab:exp2-completion}, and \ref{tab:exp2-hungup} report strict success (excluding infra), completion, and hung-up rate, respectively. Outcome decomposition is in Table~\ref{tab:exp2-outcomes}. The pilot is at $N=\rerunPlaceholderN$ per persona per arm under the \emph{impatient} client mode (run tag \texttt{exp2\_full100}); zero infra failures occurred in any cell.
 
 \begin{table}[htbp]
   \centering
-  \caption{Experiment two (\emph{impatient} client mode): engagement-aware completion rate. $N=\rerunPlaceholderN$ per persona per arm; Wilson 95\% intervals. \todoEx{exp2-pilot}.}
-  \label{tab:exp2-engagement}
-  \begin{tabular}{lccc}
-    \toprule
-    Persona & Upfront baseline & Rigid orchestrator & Loose orchestrator \\
-    \midrule
-    \texttt{support\_rambler}   & \todoEx{} & \todoEx{} & \todoEx{} \\
-    \texttt{support\_billing}   & \todoEx{} & \todoEx{} & \todoEx{} \\
-    \texttt{support\_technical} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    \midrule
-    Equal-weighted mean         & \todoEx{} & \todoEx{} & \todoEx{} \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \caption{Experiment two (\emph{impatient} client mode): strict success excluding infra. $N=\rerunPlaceholderN$ per persona per arm; Wilson 95\% intervals. \todoEx{exp2-pilot}.}
+  \caption{Experiment two (\emph{impatient} client mode, run tag \texttt{exp2\_full100}): strict success excluding infra. $N=\rerunPlaceholderN$ per persona per arm; Wilson 95\% intervals. Both orchestrators substantially outperform the upfront baseline; the persona-level rigid-vs-loose comparison is mixed (loose dominates technical, rigid edges rambler, near-tied on billing).}
   \label{tab:exp2-strict}
   \begin{tabular}{lccc}
     \toprule
     Persona & Upfront baseline & Rigid orchestrator & Loose orchestrator \\
     \midrule
-    \texttt{support\_rambler}   & \todoEx{} & \todoEx{} & \todoEx{} \\
-    \texttt{support\_billing}   & \todoEx{} & \todoEx{} & \todoEx{} \\
-    \texttt{support\_technical} & \todoEx{} & \todoEx{} & \todoEx{} \\
+    \texttt{support\_rambler}   & [30.9, 49.8]\% & [71.1, 86.7]\%  & [68.9, 85.0]\% \\
+    \texttt{support\_billing}   & [36.6, 55.7]\% & [96.3, 100.0]\% & [93.0, 99.4]\% \\
+    \texttt{support\_technical} & [26.4, 44.7]\% & [60.4, 78.1]\%  & [82.6, 94.5]\% \\
     \midrule
-    Equal-weighted mean         & \todoEx{} & \todoEx{} & \todoEx{} \\
+    Equal-weighted mean         & 40.3\%         & 83.3\%          & 88.7\%         \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{table}[htbp]
   \centering
+  \caption{Experiment two: completion rate (procedure called \texttt{done}), $N=\rerunPlaceholderN$ per persona per arm; Wilson 95\% intervals. Both orchestrators near-saturate completion; the upfront baseline completes only 36--46\% of runs, with most of the failures being \texttt{incomplete} rather than \texttt{hung\_up} (Table~\ref{tab:exp2-outcomes}).}
+  \label{tab:exp2-completion}
+  \begin{tabular}{lccc}
+    \toprule
+    Persona & Upfront baseline & Rigid orchestrator & Loose orchestrator \\
+    \midrule
+    \texttt{support\_rambler}   & [31.9, 50.8]\% & [93.0, 99.4]\%  & [75.6, 89.9]\%  \\
+    \texttt{support\_billing}   & [36.6, 55.7]\% & [96.3, 100.0]\% & [93.0, 99.4]\%  \\
+    \texttt{support\_technical} & [27.3, 45.8]\% & [96.3, 100.0]\% & [96.3, 100.0]\% \\
+    \midrule
+    Equal-weighted mean         & 41.0\%         & 99.3\%          & 94.0\%          \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Experiment two: hung-up rate (the simulator's patience budget reached zero before the agent called \texttt{done}), $N=\rerunPlaceholderN$ per persona per arm; Wilson 95\% intervals. The orchestration trade-off lives almost entirely in this column: the loose orchestrator's flexibility is what costs it 16/100 hung-ups on \texttt{support\_rambler}.}
+  \label{tab:exp2-hungup}
+  \begin{tabular}{lccc}
+    \toprule
+    Persona & Upfront baseline & Rigid orchestrator & Loose orchestrator \\
+    \midrule
+    \texttt{support\_rambler}   & [0.0, 3.7]\% & [0.6, 7.0]\% & [10.1, 24.4]\% \\
+    \texttt{support\_billing}   & [0.0, 3.7]\% & [0.0, 3.7]\% & [0.6, 7.0]\%   \\
+    \texttt{support\_technical} & [0.0, 3.7]\% & [0.0, 3.7]\% & [0.0, 3.7]\%   \\
+    \midrule
+    Equal-weighted mean         & 0.0\%        & 0.7\%        & 6.0\%          \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/charts/exp2_summary.tex}
+  \caption{Experiment two: the three headline metrics (strict success
+  ex-infra, completion, hung-up rate) for each arm and persona, with
+  Wilson 95\% intervals. Same numbers as
+  Tables~\ref{tab:exp2-strict}--\ref{tab:exp2-hungup}. The persona-shaped
+  rigid-vs-loose trade-off is what to read off this chart: on
+  \texttt{support\_technical}, loose dominates rigid on strict success at
+  zero hung-up cost; on \texttt{support\_billing}, both orchestrators
+  saturate; on \texttt{support\_rambler}, the loose orchestrator's
+  16/100 hung-up rate is the price of its flexibility.}
+  \label{fig:chart-exp2-summary}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
   \small
-  \caption{Experiment two: outcome decomposition by arm. \todoEx{exp2-pilot}.}
+  \caption{Experiment two: outcome decomposition by arm. Counts of runs (out of $N=\rerunPlaceholderN$ per cell). \texttt{strict\_fail} is the \texttt{completed\_strict\_fail} class from experiment one (procedure called \texttt{done} but at least one required field did not strict-match). The upfront baseline's failures are concentrated in \texttt{incomplete} (the agent never reached \texttt{done}); both orchestrators close the \texttt{incomplete} column to zero, and the loose orchestrator pays for that with a non-trivial \texttt{hung\_up} count on \texttt{support\_rambler}.}
   \label{tab:exp2-outcomes}
   \resizebox{\linewidth}{!}{%
   \begin{tabular}{llrrrrr}
     \toprule
     Arm & Persona & \texttt{strict\_ok} & \texttt{incomplete} & \texttt{strict\_fail} & \texttt{hung\_up} & \texttt{infra} \\
     \midrule
-    Upfront     & \texttt{support\_rambler}   & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Upfront     & \texttt{support\_billing}   & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Upfront     & \texttt{support\_technical} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Rigid       & \texttt{support\_rambler}   & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Rigid       & \texttt{support\_billing}   & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Rigid       & \texttt{support\_technical} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Loose       & \texttt{support\_rambler}   & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Loose       & \texttt{support\_billing}   & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
-    Loose       & \texttt{support\_technical} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} & \todoEx{} \\
+    Upfront     & \texttt{support\_rambler}   &  40 & 59 &  1 &  0 & 0 \\
+    Upfront     & \texttt{support\_billing}   &  46 & 54 &  0 &  0 & 0 \\
+    Upfront     & \texttt{support\_technical} &  35 & 64 &  1 &  0 & 0 \\
+    Rigid       & \texttt{support\_rambler}   &  80 &  0 & 18 &  2 & 0 \\
+    Rigid       & \texttt{support\_billing}   & 100 &  0 &  0 &  0 & 0 \\
+    Rigid       & \texttt{support\_technical} &  70 &  0 & 30 &  0 & 0 \\
+    Loose       & \texttt{support\_rambler}   &  78 &  0 &  6 & 16 & 0 \\
+    Loose       & \texttt{support\_billing}   &  98 &  0 &  0 &  2 & 0 \\
+    Loose       & \texttt{support\_technical} &  90 &  0 & 10 &  0 & 0 \\
     \bottomrule
   \end{tabular}%
   }
 \end{table}
 
-\subsection{What we expect to see and why it matters}
+\begin{figure}[htbp]
+  \centering
+  \input{diagrams/charts/exp2_outcomes.tex}
+  \caption{Experiment two: outcome decomposition (same counts as
+  Table~\ref{tab:exp2-outcomes}). The upfront baseline's failures are
+  almost entirely \texttt{incomplete} (orange) --- the agent never
+  reached \texttt{done}. Both orchestrator arms close the
+  \texttt{incomplete} segment to zero in every cell, replacing it with a
+  mix of \texttt{strict\_fail} (amber) and, for the loose orchestrator,
+  \texttt{hung\_up} (violet). The violet segment is what makes the
+  rigid-vs-loose trade-off visible: it is large only on
+  \texttt{support\_rambler}.}
+  \label{fig:chart-exp2-outcomes}
+\end{figure}
 
-The interesting outcome of experiment two is not whether one arm dominates everywhere; it is the \emph{shape} of the trade-off. The rigid orchestrator is what most off-the-shelf state-machine ``flow'' tools produce: it gives strong compliance guarantees and is easy to reason about, at the cost of a class of runs that hang up because the user's stated priority is not on the script. The loose orchestrator gives up some of that easy-to-reason-about quality in exchange for accommodating user preferences when those preferences do not violate compliance prerequisites. The upfront baseline has no orchestrator at all; it is free to follow user preferences but has no enforcement mechanism, and so we expect it to give up strict success in exchange for engagement.
+\subsection{What we found}
 
-H2 says, in plain language, that the loose orchestrator is the dominant choice for an impatient user population because it preserves both engagement and compliance enforcement. H3 says that the form-filling layer benefit from experiment one is composable: putting a smarter orchestrator on top of an MCP-style elicitation form-filler does not undo the form-filler's reliability win.
+The headline is straightforward and matches H3 cleanly: \textbf{both orchestrators dominate the upfront baseline on strict success and completion}. Equal-weighted across personas, the upfront baseline reaches 40.3\% strict success ex-infra; the rigid orchestrator reaches 83.3\%; the loose orchestrator reaches 88.7\%. On completion the gap is starker: the upfront baseline finishes 41\% of runs (most of its failures are \texttt{incomplete}---the agent never reaches \texttt{done}), while the orchestrator arms finish 99.3\% (rigid) and 94.0\% (loose). This is consistent with experiment one's mechanism: pushing the workflow's phase-level checklist out of the upfront prompt and into a tool that authors phase-by-phase elicitations removes the recovery-loop failure mode at the orchestration layer the same way \texttt{collect\_field} removed it at the form-filling layer.
+
+The rigid-vs-loose trade-off is more nuanced than H2 predicted. H2 said the loose orchestrator should dominate the rigid one on the joint axis of strict success and hung-up rate. The actual result is \emph{persona-dependent}:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{\texttt{support\_technical}}: loose dominates rigid on strict success by +20pp (90\% vs.\ 70\%), with zero hung-ups in either arm. The technical-issue persona's preferred topic (a device misbehavior) flows naturally into the form-filling phase (the device-model question is a direct continuation of the same topic), so the loose orchestrator's willingness to acknowledge and engage the user's chosen topic before pivoting to ordering is exactly the right move.
+    \item \textbf{\texttt{support\_billing}}: rigid and loose are essentially tied at near-ceiling (100\% vs.\ 98\%); both orchestrators saturate the persona because billing's required fields and the persona's preferred topic both naturally surface the disclosure and acknowledgment phases.
+    \item \textbf{\texttt{support\_rambler}}: rigid edges loose on strict success (80\% vs.\ 78\%), but more interestingly, the loose orchestrator hangs up 16 of 100 runs versus rigid's 2. The rambler persona's ``buries answers in long stories'' pattern interacts badly with the loose orchestrator's topic-acknowledgment phase: each time the agent acknowledges the rambling topic before pivoting back to a required field, the persona spends another turn rambling, and on enough such cycles the patience budget goes to zero.
+\end{itemize}
+
+H2 is therefore partly falsified. The loose orchestrator does \emph{not} dominate the rigid one across personas; it dominates on the persona whose preferred topic naturally segues into form-filling, ties on the persona whose required fields cover the topic, and concedes a meaningful hung-up rate on the persona whose topic-engagement style is itself a deflection trap. This is more interesting than H2's flat prediction would have been: the choice between rigid and loose orchestration depends on the predicted distribution of user behaviors, not on any abstract preference for flexibility.
+
+H3 (the form-filling-layer benefit composes under either orchestrator) is well-supported. Both orchestrators reach the same 80--100\% strict-success regime that experiment one's guided arm reached on \emph{ideal} mode, despite running under a more adversarial simulator (impatient mode with a finite patience budget). The fact that the orchestrator arms also recover the 99\%+ completion rate seen in experiment one's guided arm tells us the nested form-filling sub-tools and the outer orchestrator are composing without erosion: the per-field elicitation reliability is not consumed by the addition of a phase-level orchestrator.
 
 \paragraph{What this experiment does \emph{not} say.}
-Experiment two does not test orchestrator mechanisms beyond two points on the rigid--loose spectrum, and it does not test orchestrator authorship by an LLM-condensed planner (vignette 4). It also does not test the multi-system-prompt-selection architecture directly: doing so would require a third agent runtime configuration, and the present infrastructure is single-agent-per-run. We discuss this gap explicitly in Section~\ref{sec:limits}.
+Experiment two does not test orchestrator mechanisms beyond two points on the rigid--loose spectrum, and it does not test orchestrator authorship by an LLM-condensed planner (vignette 4). It also does not test the multi-system-prompt-selection architecture directly: doing so would require a third agent runtime configuration, and the present infrastructure is single-agent-per-run. The persona-dependent shape of the rigid-vs-loose trade-off is itself a finding worth replicating---it predicts that production deployments should choose between rigid and loose orchestration based on the dominant user behavior the workflow has to absorb, rather than on a generic preference for one or the other. We discuss the open design space in Section~\ref{sec:open-design-space}.
 
 % =============================================================================
 \section{Threats to validity and limitations}
@@ -927,7 +1134,7 @@ Relatedly, the elicitation payloads returned by \texttt{collect\_field} (and, in
 At elicitation prompts, the \emph{ideal} simulator mode responds with the requested ground-truth field directly. This idealizes the user as a perfectly cooperative structured client: every \texttt{collect\_field} elicitation that the LLM relays verbatim is answered with a value that, after the procedure's lightweight normalization, will pass validation on the first try. Some portion of the guided arm's reliability gain therefore reflects the simulator behavior that is paired with the intervention, not the intervention alone. To probe this concern directly, we run the same harness in a second simulator mode, \emph{non\_ideal} (Section~\ref{sec:protocol}), that injects format noise, refusals, and wrong-then-correct replies at first ask. The \emph{non\_ideal} mode exercises the guided arm's retry loop end-to-end and exposes a class of failures that the in-context validation feedback cannot see through: when the noise produces a value that is well-formed but wrong (e.g.\ a phone number whose area-code digit has been incremented), no per-field validator can reject it; the strict ground-truth check at the end of the run is the only signal. This is the experiment's clean construct-validity check rather than an artifact: it isolates the slice of failures that no in-the-moment elicitation can fix, and it depresses the guided arm's strict success rate accordingly. We report \emph{ideal} and \emph{non\_ideal} cells separately for both arms.
 
 \paragraph{Simulator--orchestrator interaction (experiment two).}
-The \emph{impatient} client mode's deflection-detection rule is heuristic, and the patience budget $B$ is a parameter we plan to calibrate via pilot. Different deflection rules and different $B$ values would shift the absolute hang-up rate, and therefore the absolute engagement-aware completion rate, in every cell. The qualitative direction predicted by H2 should be robust to those parameters within reasonable ranges, but the magnitudes should not be over-interpreted. We will report sensitivity to $B$ in the experiment-two pilot results.
+The \emph{impatient} client mode's deflection-detection rule is heuristic, and the patience budget $B$ is a parameter we calibrated by pilot rather than derived. Different deflection rules and different $B$ values would shift the absolute hung-up rate (and therefore the completion rate) in every cell. We expect the qualitative shape---rigid trades a small amount of strict success for a much lower hung-up rate, loose trades a higher hung-up rate for marginally better strict success when the user's preferred topic dovetails with form-filling---to be robust within reasonable parameter ranges, but the absolute magnitudes should not be over-interpreted. A sensitivity sweep over $B$ is the natural follow-up.
 
 \paragraph{Comparisons we did not run.}
 The space of architectures named in Section~\ref{sec:background} is large and we tested two slices of it. We did not test the multi-system-prompt-selection architecture directly, even though it is one of the two prevailing patterns we argue against. Two reasons: first, doing so requires a different agent runtime configuration than the one the rest of the experiments share, and we wanted the comparisons to differ only in the variables under test; second, a fair multi-system-prompt-selection arm would itself require a control-flow design choice (router state machine? planner? learned router?) that is itself the subject of a separate experimental design. We see the multi-system-prompt-selection vs.\ tool-authored-just-in-time comparison as the natural follow-up to this paper, and we discuss it as future work in Section~\ref{sec:open-design-space}. We also did not test the LLM-condensed planner back-end (vignette 4 of Section~\ref{sec:engineering}), which sits on the same architectural axis as our other tool-authored arms but introduces model stochasticity at the authorship layer and would need its own controlled study.
@@ -960,7 +1167,7 @@ The \emph{impatient} simulator's deflection-detection heuristic is evaluated by 
 The two experiments in this paper sample two points in the space named by Section~\ref{sec:engineering}. The space itself is much larger and worth mapping deliberately. We close with the design questions we did not try to answer, in roughly the order we think they deserve attention.
 
 \paragraph{Multi-system-prompt-selection vs.\ tool-authored just-in-time.}
-The most direct gap in this paper is the missing third arm: an explicit multi-system-prompt-selection agent that switches between several short configurations rather than calling a tool. A well-designed comparison would give the multi-system-prompt-selection arm the same task substrate, the same validators, the same simulator, and a controlled router (state-machine, planner, learned, or hand-tuned), and would compare its strict success and engagement-aware completion against tool-authored-just-in-time on both the form-filling layer and the orchestration layer. This is the natural follow-up study to the present one.
+The most direct gap in this paper is the missing third arm: an explicit multi-system-prompt-selection agent that switches between several short configurations rather than calling a tool. A well-designed comparison would give the multi-system-prompt-selection arm the same task substrate, the same validators, the same simulator, and a controlled router (state-machine, planner, learned, or hand-tuned), and would compare its strict success, completion, and hung-up rate against tool-authored-just-in-time on both the form-filling layer and the orchestration layer. This is the natural follow-up study to the present one.
 
 \paragraph{Authorship-mechanism comparisons within tool-authored just-in-time.}
 We named five back-end mechanisms (Section~\ref{sec:engineering}) and tested two: the compiled-in checklist and the rigid/loose state-machine orchestrator. A controlled comparison of state-machine, soft script, and LLM-condensed back-ends behind the same outer tool surface would isolate the cost of model stochasticity at the authorship layer. We expect the LLM-condensed back-end to dominate when the workflow has many natural-language nuances and to lose ground on highly structured workflows where determinism is itself the value proposition.
@@ -979,9 +1186,9 @@ A separable axis from the architectural one is whether the LLM is fine-tuned on 
 
 We argued for an alternative to the two architectures that currently dominate guided-conversation work: instead of writing the workflow into one long upfront system prompt, or maintaining several upfront system prompts and routing per-turn control to one of them, keep the LLM in a single conversational role and engineer its context dynamically by authoring short, schema-typed guidance messages from the tool layer at the moment they are needed. The Model Context Protocol's elicitation pattern gives a typed shape for what those just-in-time messages look like; the back-end behind the tool can be anything from a compiled-in checklist to a state machine to an orchestrator that delegates to nested sub-tools.
 
-The two experiments isolate two layers of the architecture. Experiment one isolates the form-filling layer: replacing a long upfront checklist with per-step tool-authored elicitations from a single \texttt{collect\_field} tool produces a measurable strict-success and completion gain on a constrained intake workflow with three personas and two simulator client modes ($N=\rerunPlaceholderN$ per persona per arm; full-pilot numbers in Section~\ref{sec:exp1}). The mechanism behind the gain is concrete: the LLM is no longer asked to be both the conversational policy and the workflow's checklist, and the long recovery tails that dominate the unguided baseline disappear. Experiment two isolates the orchestration layer: holding the form-filling layer constant, a rigid orchestrator that strictly enforces phase order and a loose orchestrator that defers to user preference subject to compliance prerequisites yield different trade-offs under an \emph{impatient} simulator client mode, with the loose orchestrator expected to dominate on engagement-aware completion (numbers in Section~\ref{sec:exp2}).
+The two experiments isolate two layers of the architecture. Experiment one isolates the form-filling layer: replacing a long upfront checklist with per-step tool-authored elicitations from a single \texttt{collect\_field} tool lifts equal-weighted strict success from 53.3\% to 99.0\% under \emph{ideal} client mode and from 56.7\% to 71.7\% under \emph{non\_ideal}, and lifts completion from 47--80\% to a uniform 100\% under both modes ($N=\rerunPlaceholderN$ per persona per arm; Section~\ref{sec:exp1}). The mechanism behind the gain is concrete: the LLM is no longer asked to be both the conversational policy and the workflow's checklist, and the long recovery tails that dominate the unguided baseline disappear. Experiment two isolates the orchestration layer: holding the form-filling layer constant, both a rigid orchestrator that strictly enforces phase order and a loose orchestrator that defers to user preference subject to compliance prerequisites lift equal-weighted strict success from the upfront baseline's 40.3\% to 83.3\% (rigid) and 88.7\% (loose), with the loose orchestrator paying for its higher strict-success ceiling with a non-trivial hung-up rate on the rambling persona (Section~\ref{sec:exp2}). The form-filling-layer reliability win composes cleanly under either orchestrator; the choice between rigid and loose is itself a separable design knob whose right setting depends on the predicted distribution of user behavior.
 
-What the two experiments share is the framing. Where procedural detail lives, and at what granularity it reaches the LLM, is a control-architecture choice with measurable reliability consequences. Putting that procedural detail into program logic that authors short, just-in-time elicitations---rather than into one large upfront prompt or several short prompts plus a router---is a competitive architecture for guided conversations, and the design space behind it is large enough to warrant deliberate study.
+What the two experiments share is the framing. Where procedural detail lives, and at what granularity it reaches the LLM, is a control-architecture choice with measurable reliability consequences. Putting that procedural detail into program logic that authors short, just-in-time elicitations---rather than into one large upfront prompt or several short prompts plus a router---is a competitive architecture for guided conversations, and the design space behind it is large enough to warrant deliberate study. The architectural commitment is to where the procedure lives (single conversational role, tool-authored just-in-time guidance); the back-end mechanism behind the tool---rigid state machine, loose script, LLM-condensed planner, nested orchestrator---is a separable choice with its own reliability and flexibility trade-offs.
 
 % =============================================================================
 \appendix

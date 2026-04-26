@@ -1,0 +1,75 @@
+% =============================================================================
+% Shared TikZ vocabulary for diagrams in this paper.
+%
+% The colors are the canonical paper palette:
+%   orange = unguided / LLM-managed
+%   green  = guided / procedure-owned
+%   blue   = task / protocol substrate
+%   amber  = out-of-band callouts and notes
+%
+% Colors themselves are defined in main.tex (so the sequence diagrams that
+% predate this file keep working). This file only defines the named TikZ
+% styles that the boxes-and-arrows diagrams use.
+% =============================================================================
+
+\tikzset{
+  % --- Generic block styles for boxes-and-arrows diagrams. -------------------
+  diagBox/.style={
+    draw=rulegray, fill=white, rounded corners=2pt,
+    font=\sffamily\small, inner sep=4pt, align=center,
+    line width=0.5pt, minimum height=8mm
+  },
+  diagBoxU/.style={diagBox, draw=ungOrange},
+  diagBoxG/.style={diagBox, draw=guGreen},
+  diagBoxT/.style={diagBox, draw=taskBlue, fill=taskBg},
+  diagBoxO/.style={diagBox, draw=oobAmber, fill=oobBg},
+  diagBoxFaint/.style={diagBox, draw=guGreen, fill=guBg!40},
+  % --- Decision diamond (used by the outcome classification diagram). -------
+  decision/.style={
+    draw=rulegray, fill=white, diamond, aspect=2,
+    font=\sffamily\small, inner sep=2pt, align=center,
+    line width=0.5pt, minimum width=22mm, minimum height=10mm
+  },
+  % --- Edge styles. ---------------------------------------------------------
+  flow/.style={-{Stealth[length=2.2mm]}, line width=0.5pt,
+               font=\sffamily\scriptsize, color=rulegray},
+  flowG/.style={flow, color=guGreen},
+  flowU/.style={flow, color=ungOrange},
+  flowDashed/.style={flow, dashed},
+  flowGDashed/.style={flowG, dashed},
+  flowDotted/.style={flow, dotted, -},
+  edgelbl/.style={font=\sffamily\scriptsize, fill=white, inner sep=1pt,
+                  align=center},
+  % --- Containers. ---------------------------------------------------------
+  diagPanel/.style={
+    draw=rulegray, fill=white, rounded corners=4pt, dashed, line width=0.5pt,
+    inner sep=6pt
+  },
+  diagPanelU/.style={
+    draw=ungOrange, fill=ungBg, rounded corners=4pt, line width=0.6pt,
+    inner sep=6pt
+  },
+  diagPanelG/.style={
+    draw=guGreen, fill=guBg, rounded corners=4pt, line width=0.6pt,
+    inner sep=6pt
+  },
+  diagPanelT/.style={
+    draw=taskBlue!60, fill=taskBg!60, rounded corners=4pt, dashed,
+    line width=0.5pt, inner sep=6pt
+  },
+  panelLabel/.style={font=\sffamily\bfseries\small, color=rulegray},
+  panelLabelU/.style={font=\sffamily\bfseries\small, color=ungOrange},
+  panelLabelG/.style={font=\sffamily\bfseries\small, color=guGreen},
+  panelLabelT/.style={font=\sffamily\bfseries\small, color=taskBlue},
+  % --- Outcome class chips (used in the outcome-classification diagram and
+  %     in the Experiment 2 outcome-decomposition chart legends). ------------
+  outOk/.style={diagBox, draw=guGreen, fill=guBg},
+  outFail/.style={diagBox, draw=oobAmber, fill=oobBg},
+  outIncomplete/.style={diagBox, draw=ungOrange, fill=ungBg},
+  outInfra/.style={diagBox, draw=red!60!black, fill=red!10},
+  outHung/.style={diagBox, draw=violet!70!black, fill=violet!10},
+  metricChip/.style={
+    draw=rulegray, dashed, rounded corners=2pt, font=\sffamily\scriptsize,
+    inner sep=3pt, align=center, line width=0.4pt
+  },
+}

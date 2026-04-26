@@ -1,0 +1,47 @@
+% Experiment 1 strict-success grouped bar chart.
+% Two bars per (mode, persona) cell: unguided (orange) vs guided (green),
+% Wilson 95% CI error bars. Data: diagrams/data/exp1_strict.csv.
+
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth, height=72mm,
+    ybar=2pt, bar width=9pt,
+    enlarge x limits=0.10,
+    ymin=0, ymax=110,
+    ytick={0,20,40,60,80,100},
+    ylabel={Strict success ex-infra (\%)},
+    symbolic x coords={
+      rambler-ideal, billing-ideal, technical-ideal,
+      rambler-non-ideal, billing-non-ideal, technical-non-ideal
+    },
+    xtick=data,
+    xticklabel style={rotate=20, anchor=north east, font=\sffamily\scriptsize},
+    yticklabel style={font=\sffamily\scriptsize},
+    legend style={
+      at={(0.02,0.98)}, anchor=north west, font=\sffamily\scriptsize,
+      draw=rulegray, fill=white, fill opacity=0.9, text opacity=1,
+      /tikz/every even column/.append style={column sep=4pt},
+    },
+    every axis plot/.append style={fill opacity=0.85},
+    error bars/y dir=both,
+    error bars/y explicit,
+    error bars/error bar style={line width=0.4pt, color=black},
+    grid=major, grid style={dashed, gray!30},
+    nodes near coords align={vertical},
+]
+
+\addplot+[fill=ungOrange, draw=ungOrange]
+  table[col sep=space, x=cell, y=unguided,
+        y error plus expr=\thisrow{u_hi}-\thisrow{unguided},
+        y error minus expr=\thisrow{unguided}-\thisrow{u_lo}]
+  {diagrams/data/exp1_strict.csv};
+
+\addplot+[fill=guGreen, draw=guGreen]
+  table[col sep=space, x=cell, y=guided,
+        y error plus expr=\thisrow{g_hi}-\thisrow{guided},
+        y error minus expr=\thisrow{guided}-\thisrow{g_lo}]
+  {diagrams/data/exp1_strict.csv};
+
+\legend{Unguided (upfront prompt), Guided (\texttt{collect\_field})}
+\end{axis}
+\end{tikzpicture}

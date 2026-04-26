@@ -1,0 +1,49 @@
+% Vignette 2: a state machine behind the elicitation tool.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    node distance=6mm and 10mm,
+]
+
+\node[diagBoxFaint, text width=22mm] (agent)
+  {LLM agent\\\scriptsize single role};
+\node[diagBoxG, right=12mm of agent, text width=24mm] (tool)
+  {\texttt{run\_phase()}};
+
+% State machine cluster.
+\node[diagBoxG, right=22mm of tool.east, text width=20mm, anchor=west] (nDisc)
+  {privacy\\disclosure};
+\node[diagBoxG, right=of nDisc, text width=20mm] (nCat)
+  {issue\\category};
+\node[diagBoxG, below=10mm of nCat, text width=22mm] (nForm)
+  {form-filling\\\scriptsize branch-aware};
+\node[diagBoxG, left=of nForm, text width=20mm] (nPlan)
+  {plan +\\approval};
+\node[diagBoxG, below=10mm of nPlan, text width=20mm] (nDone)
+  {done};
+
+\draw[flowG] (nDisc) -- node[edgelbl, above] {ack} (nCat);
+\draw[flowG] (nCat)  -- node[edgelbl, right] {category set} (nForm);
+\draw[flowG] (nForm) -- node[edgelbl, above, align=center]
+                       {all required\\fields stored} (nPlan);
+\draw[flowG] (nPlan) -- node[edgelbl, left, align=center]
+                       {plan\_approval\\= yes} (nDone);
+
+\begin{pgfonlayer}{background}
+  \node[diagPanelG, fit=(nDisc)(nCat)(nForm)(nPlan)(nDone),
+        label={[panelLabelG, anchor=north, yshift=-1mm]south:State machine: phases + guarded transitions},
+        inner sep=8pt] (smPanel) {};
+\end{pgfonlayer}
+
+\draw[flowG] (agent) -- node[edgelbl, above] {call} (tool);
+\draw[flowG] (tool.east) -- node[edgelbl, above, align=center]
+                          {read state} (smPanel.west);
+\draw[flowGDashed] (smPanel.south west) .. controls +(-0.5,-0.8) and +(0.5,-0.8) ..
+                  node[edgelbl, below, align=center]
+                  {elicitation for\\current node} (tool.south);
+\draw[flowGDashed] (tool.north west) .. controls +(-0.6,0.4) and +(0.6,0.4) ..
+                  node[edgelbl, above, align=center]
+                  {elicit / accepted /\\blocked payload} (agent.north);
+
+\end{tikzpicture}

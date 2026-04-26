@@ -1,0 +1,59 @@
+% Vignette 5: an orchestrator tool with continuation-passing.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    node distance=8mm and 14mm,
+]
+
+\node[diagBoxFaint, text width=24mm] (agent)
+  {LLM agent\\\scriptsize single role,\\acts as scheduler};
+
+% Orchestrator panel.
+\node[diagBoxG, right=20mm of agent, text width=36mm] (orch)
+  {\texttt{run\_phase()}\\\scriptsize phase author:\\state machine OR soft script};
+\node[diagBoxG, below=of orch, text width=36mm] (pstate)
+  {Procedure state\\\scriptsize current phase,\\compliance prerequisites};
+\draw[flowG] (orch) -- node[edgelbl, right] {read} (pstate);
+\draw[flowGDashed] (pstate.west) .. controls +(-1.0,0) and +(-1.0,0) ..
+                  node[edgelbl, left] {eligible phases} (orch.west);
+\begin{pgfonlayer}{background}
+  \node[diagPanelG, fit=(orch)(pstate),
+        label={[panelLabelG, anchor=north, yshift=-1mm]south:Orchestrator tool},
+        inner sep=8pt] (orchPanel) {};
+\end{pgfonlayer}
+
+% Sub-tools panel.
+\node[diagBoxG, right=20mm of orch, text width=36mm] (subForm)
+  {\texttt{collect\_field()}\\\scriptsize form-filling sub-tool;\\compiled-in checklist};
+\node[diagBoxG, below=of subForm, text width=36mm] (subDisc)
+  {\texttt{record\_compliance()}\\\scriptsize privacy / fee disclosures};
+\node[diagBoxG, below=of subDisc, text width=36mm] (subDone)
+  {\texttt{done()}\\\scriptsize termination};
+\begin{pgfonlayer}{background}
+  \node[diagPanelG, fit=(subForm)(subDisc)(subDone),
+        label={[panelLabelG, anchor=north, yshift=-1mm]south:Nested sub-tools},
+        inner sep=8pt] (subPanel) {};
+\end{pgfonlayer}
+
+% Edges between agent / orch / sub-tools.
+\draw[flowG] (agent) -- node[edgelbl, above] {call \texttt{run\_phase()}} (orchPanel.west);
+\draw[flowGDashed] (orchPanel.north west) .. controls +(-1.4,0.6) and +(0.6,0.6) ..
+                  node[edgelbl, above, align=center]
+                  {elicit \{ message,\\next\_hint: ``call sub-tool X'' \}} (agent.north);
+
+\draw[flowG] (agent.east) .. controls +(8,-0.6) and +(-2,0.4) ..
+                  node[edgelbl, below=2mm, align=center, pos=0.65]
+                  {call (per next\_hint)} (subForm.west);
+\draw[flowG] (agent.east) .. controls +(8,-1.6) and +(-2,0.0) .. (subDisc.west);
+\draw[flowG] (agent.east) .. controls +(8,-2.6) and +(-2,-0.4) .. (subDone.west);
+
+\draw[flowGDashed] (subForm.north) .. controls +(0,1.4) and +(2,1.4) ..
+                  node[edgelbl, above, align=center, pos=0.7]
+                  {accepted / elicit} (agent.north east);
+
+\draw[flowG, dotted] (agent.south east) .. controls +(2,-1.6) and +(-1,-2.4) ..
+                  node[edgelbl, below, align=center]
+                  {re-call with\\sub-tool result} (orchPanel.south west);
+
+\end{tikzpicture}

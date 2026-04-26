@@ -1,0 +1,123 @@
+% Figure: three architectures for guided-conversation control.
+%
+% Three side-by-side columns showing what one LLM request's input context
+% looks like under each architecture. ALL shared rows use fixed absolute
+% y-coordinates so they align horizontally across the three columns.
+% Panel 3 is the only one with extra rows (tool result + SYSTEM hint) between
+% "assistant" and "user (current)"; P1 and P2 show empty space there.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\scriptsize},
+    % Shared content-box style variants
+    ctxU/.style={draw=ungOrange!55, fill=ungBg!40, rounded corners=2pt,
+                 text width=36mm, inner sep=3pt, font=\ttfamily\scriptsize,
+                 align=left, anchor=north west, minimum width=36mm},
+    ctxT/.style={draw=taskBlue!50, fill=blue!5, rounded corners=2pt,
+                 text width=36mm, inner sep=3pt, font=\ttfamily\scriptsize,
+                 align=left, anchor=north west, minimum width=36mm},
+    ctxG/.style={draw=guGreen!60, fill=guBg!35, rounded corners=2pt,
+                 text width=36mm, inner sep=3pt, font=\ttfamily\scriptsize,
+                 align=left, anchor=north west, minimum width=36mm},
+    % System prompt box (neutral gray, forced to same height in all panels)
+    ctxSys/.style={draw=gray!50, fill=gray!8, rounded corners=2pt,
+                   text width=36mm, inner sep=3pt, font=\ttfamily\scriptsize,
+                   align=left, anchor=north west, minimum width=36mm,
+                   minimum height=18mm},
+    % Amber: router / just-in-time SYSTEM hint
+    ctxAmt/.style={draw=oobAmber!80, fill=oobBg, rounded corners=2pt,
+                   text width=36mm, inner sep=3pt, font=\ttfamily\scriptsize,
+                   align=left, anchor=north west, minimum width=36mm},
+]
+
+% ── Fixed row y-anchors (anchor=north → top of each box sits at this y) ──
+%   title  :  4.85  (label anchor=south, so bottom of title text here)
+%   sys    :  4.5   (min-height 18 mm → bottom ≈ 2.7; P1 content ≤ 4 lines)
+%   userN  :  2.2   (single-line → bottom ≈ 1.7; 5 mm clear of all sys bottoms)
+%   asst   :  1.5   (single-line → bottom ≈ 1.0)
+%   tool   :  0.8   (Panel 3 only, 2-line → bottom ≈ 0.0)
+%   hint   : -0.2   (Panel 3 only, 3-line → bottom ≈ -1.4)
+%   ucur   : -1.7   (all panels — "user (current request)")
+%   router : -2.5   (Panel 2 only, 3-line → bottom ≈ -3.7)
+%   note   : -3.9   (italic note)
+%   bot    : -4.8   (invisible anchor for equal panel heights)
+% ─────────────────────────────────────────────────────────────────────────
+
+% =================== PANEL 1 : Single upfront prompt ===================
+\begin{scope}[shift={(0,0)}]
+  \node[panelLabelU, anchor=south west] (p1Title) at (0,4.85)
+       {1. Single upfront prompt};
+  \node[ctxSys] (p1Sys) at (0,4.5)
+       {\textbf{system}\\
+        Long static prompt: full\\
+        checklist, ordering, branch\\
+        rules, completion, all tools.};
+  \node[ctxU] (p1U)  at (0,2.2)  {user (turn $N$)};
+  \node[ctxU] (p1A)  at (0,1.5)  {assistant};
+  \node[ctxU] (p1Uc) at (0,-1.7) {user (current request)};
+  \node[draw=none, inner sep=0pt, minimum size=0pt] (p1Bot) at (0,-4.8) {};
+  \node[anchor=north west, font=\sffamily\tiny\itshape, color=ungOrange,
+        text width=36mm] at (0,-3.9)
+       {LLM infers field order, phrasing, and completion from the static checklist.};
+  \begin{pgfonlayer}{background}
+    \node[diagPanelU, fit=(p1Title)(p1Sys)(p1U)(p1A)(p1Uc)(p1Bot),
+          inner sep=6pt] (p1Box) {};
+  \end{pgfonlayer}
+\end{scope}
+
+% =================== PANEL 2 : Multi-prompt selection ===================
+\begin{scope}[shift={(4.8,0)}]
+  \node[panelLabelT, anchor=south west] (p2Title) at (0,4.85)
+       {2. Multi-prompt selection};
+  \node[ctxSys] (p2Sys) at (0,4.5)
+       {\textbf{system} (one of $K$)\\
+        Chosen by router per turn.\\
+        Short \& focused:\\
+        this phase only.};
+  \node[ctxT] (p2U)  at (0,2.2)  {user (turn $N$)};
+  \node[ctxT] (p2A)  at (0,1.5)  {assistant};
+  \node[ctxT] (p2Uc) at (0,-1.7) {user (current request)};
+  \node[ctxAmt] (p2Router) at (0,-2.5)
+       {\textbf{[router]}\\
+        pick 1 of $K$ system\\
+        prompts for next turn};
+  \node[draw=none, inner sep=0pt, minimum size=0pt] (p2Bot) at (0,-4.8) {};
+  \node[anchor=north west, font=\sffamily\tiny\itshape, color=taskBlue,
+        text width=36mm] at (0,-3.9)
+       {Per-turn control collapses to routing; the seam between router and prompts is itself fragile.};
+  \begin{pgfonlayer}{background}
+    \node[diagPanelT, fit=(p2Title)(p2Sys)(p2U)(p2A)(p2Uc)(p2Router)(p2Bot),
+          inner sep=6pt] (p2Box) {};
+  \end{pgfonlayer}
+\end{scope}
+
+% =================== PANEL 3 : Dynamic in-context guidance ===================
+\begin{scope}[shift={(9.6,0)}]
+  \node[panelLabelG, anchor=south west] (p3Title) at (0,4.85)
+       {3. Dynamic in-context guidance};
+  \node[ctxSys] (p3Sys) at (0,4.5)
+       {\textbf{system}\\
+        Lean, static: tool surface +\\
+        how to read elicitation\\
+        return values.};
+  \node[ctxG] (p3U)  at (0,2.2)  {user (turn $N$)};
+  \node[ctxG] (p3A)  at (0,1.5)  {assistant: tool\_call \texttt{X(\dots)}};
+  \node[ctxG] (p3T)  at (0,0.8)
+       {tool: \{action: ``elicit'',\\
+        \ \ msg: \dots,\ schema: \{\dots\}\}};
+  \node[ctxAmt] (p3Hint) at (0,-0.2)
+       {\textbf{SYSTEM} (just-in-time):\\
+        next field = account\_email\\
+        prepended to turn $N{+}1$};
+  \node[ctxG] (p3Uc) at (0,-1.7) {user (current request)};
+  \node[draw=none, inner sep=0pt, minimum size=0pt] (p3Bot) at (0,-4.8) {};
+  \node[anchor=north west, font=\sffamily\tiny\itshape, color=guGreen,
+        text width=36mm] at (0,-3.9)
+       {Single role; procedural detail authored just-in-time by tools; LLM sees only typed elicitations.};
+  \begin{pgfonlayer}{background}
+    \node[diagPanelG, fit=(p3Title)(p3Sys)(p3U)(p3A)(p3T)(p3Hint)(p3Uc)(p3Bot),
+          inner sep=6pt] (p3Box) {};
+  \end{pgfonlayer}
+\end{scope}
+
+\end{tikzpicture}

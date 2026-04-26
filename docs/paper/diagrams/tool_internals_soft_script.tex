@@ -1,0 +1,51 @@
+% Vignette 3: a soft script behind the elicitation tool.
+%
+% A partially ordered list of phases or talking points; a small piece of
+% procedure logic decides which one to surface next based on what the user
+% has done. Looser than a state machine, but ordering prerequisites still
+% block phases that would violate compliance constraints.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+]
+
+\node[diagBoxFaint, text width=22mm] (agent) at (0,0)
+  {LLM agent\\\scriptsize single role};
+\node[diagBoxG, right=14mm of agent, text width=24mm] (tool)
+  {\texttt{run\_phase()}};
+
+\node[diagBoxG, right=20mm of tool, text width=42mm, fill=guBg!40] (script)
+  {Soft script\\\scriptsize partially ordered phases\\with compliance prerequisites};
+
+\node[diagBoxG, below=10mm of script, text width=42mm] (eligible)
+  {Eligibility filter\\\scriptsize drop phases whose\\prerequisites aren't met};
+
+\node[diagBoxG, below=10mm of tool, text width=24mm] (state)
+  {Procedure state\\\scriptsize what user has\\engaged so far};
+
+\node[diagBoxG, below=10mm of state, text width=24mm] (pref)
+  {User signal\\\scriptsize most-recent topic /\\stated preference};
+
+\draw[flowG] (agent) -- node[edgelbl, above] {call} (tool);
+\draw[flowG] (tool) -- node[edgelbl, above] {consult} (script);
+\draw[flowG] (script) -- node[edgelbl, right] {filter} (eligible);
+\draw[flowG] (state.east) -- node[edgelbl, above] {read} (eligible.west);
+\draw[flowG] (pref.east) .. controls +(3.0,0) and +(-1.0,-0.4) ..
+              node[edgelbl, below=1mm, pos=0.7] {weigh} (eligible.south west);
+\draw[flowGDashed] (eligible.north west) .. controls +(-1.6,0.6) and +(0.6,-1.6) ..
+              node[edgelbl, left=1mm, align=center, pos=0.7]
+              {ranked phase\\+ elicitation message} (tool.south east);
+
+\draw[flowGDashed] (tool.north west) .. controls +(-1.0,0.6) and +(1.0,0.6) ..
+              node[edgelbl, above, align=center]
+              {elicit / accepted /\\blocked payload} (agent.north east);
+
+\node[anchor=north west, font=\sffamily\scriptsize\itshape, color=guGreen,
+      text width=\textwidth, align=center]
+     at ([yshift=-6mm]pref.south west -| agent.west)
+     {Same outer contract as vignettes 1--2; the back-end picks which
+      eligible phase to surface based on user signal, not on a fixed
+      transition graph.};
+
+\end{tikzpicture}

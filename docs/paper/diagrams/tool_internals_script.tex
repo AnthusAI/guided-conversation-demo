@@ -1,0 +1,33 @@
+% Vignette 1: a compiled-in static checklist behind the elicitation tool.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    node distance=8mm and 12mm,
+]
+
+\node[diagBoxFaint, text width=28mm] (agent)
+  {LLM agent\\\scriptsize single role};
+\node[diagBoxG, right=14mm of agent, text width=44mm] (tool)
+  {\texttt{collect\_field(name [, value])}};
+
+\node[diagBoxG, above=of tool, text width=42mm, fill=guBg!40] (list)
+  {Compiled-in checklist\\\scriptsize hand-coded list of fields,\\validators, elicitation messages};
+\node[diagBoxG, right=of tool, text width=32mm] (state)
+  {Procedure state\\\scriptsize which fields are\\still required, in order};
+\node[diagBoxG, below=of tool, text width=36mm] (valid)
+  {Per-field validator\\\scriptsize format, length,\\ordering, branch};
+
+\draw[flowG] (agent) -- node[edgelbl, above] {call} (tool);
+\draw[flowG] (tool) -- node[edgelbl, right] {read} (state);
+\draw[flowG] (tool) -- node[edgelbl, right] {lookup} (list);
+\draw[flowG] (tool) -- node[edgelbl, right] {run} (valid);
+\draw[flowGDashed] (list) .. controls +(-2.0,-0.4) and +(-2.0,0.4) ..
+                  node[edgelbl, left, align=center]
+                  {elicitation\\message + schema} (tool.north west);
+\draw[flowGDashed] (valid) -- node[edgelbl, right] {pass / fail} (tool);
+\draw[flowGDashed] (tool.west) .. controls +(-1.0,0.6) and +(1.0,0.6) ..
+                  node[edgelbl, above, align=center]
+                  {elicit / accepted /\\blocked payload} (agent.east);
+
+\end{tikzpicture}

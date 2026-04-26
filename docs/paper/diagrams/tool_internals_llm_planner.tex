@@ -1,0 +1,49 @@
+% Vignette 4: an LLM-condensed planner behind the elicitation tool.
+%
+% The procedure consults a small, focused inner LLM call to author the next
+% guidance message. The outer agent still sees only the elicitation payload;
+% the inner LLM is invisible to it. We deliberately note that this re-injects
+% model stochasticity at the authorship layer.
+
+\begin{tikzpicture}[
+    >=Stealth,
+    every node/.style={font=\sffamily\small},
+    node distance=8mm and 14mm,
+]
+
+\node[diagBoxFaint, text width=22mm] (agent)
+  {LLM agent\\\scriptsize outer single role};
+\node[diagBoxG, right=14mm of agent, text width=24mm] (tool)
+  {\texttt{run\_phase()}};
+
+\node[diagBoxG, above=of tool, text width=44mm] (state)
+  {Procedure state\\\scriptsize current phase,\\compliance prerequisites,\\recent user message};
+
+% Inner LLM, deliberately styled differently to flag stochasticity.
+\node[diagBoxG, draw=oobAmber, fill=oobBg,
+      right=18mm of tool, text width=44mm] (inner)
+  {Inner LLM call\\\scriptsize phrases the next guidance\\given current state +\\(optional) structured prompt};
+
+\node[diagBoxG, below=of inner, text width=44mm] (constrain)
+  {Structured constraint\\\scriptsize (optional) JSON schema +\\``next phase is X; phrase\\as one short question''};
+
+\draw[flowG] (agent) -- node[edgelbl, above] {call} (tool);
+\draw[flowG] (tool) -- node[edgelbl, right] {read} (state);
+\draw[flowG] (tool) -- node[edgelbl, above, align=center]
+              {state +\\constraint} (inner);
+\draw[flowG] (constrain) -- node[edgelbl, right] {(optional)} (inner);
+\draw[flowGDashed, color=oobAmber]
+            (inner.south west) .. controls +(-1.4,-0.6) and +(1.0,-0.6) ..
+            node[edgelbl, below, align=center]
+            {free-form\\elicitation message} (tool.south);
+\draw[flowGDashed] (tool.north west) .. controls +(-1.0,0.6) and +(1.0,0.6) ..
+            node[edgelbl, above, align=center]
+            {elicit / accepted /\\blocked payload} (agent.north);
+
+\node[anchor=north, font=\sffamily\scriptsize\itshape, color=oobAmber,
+      text width=78mm, align=center, below=24mm of tool]
+     {Re-introduces model stochasticity at the authorship layer.\\
+      Useful for natural-language phrasing of guidance whose
+      \emph{content} is decided programmatically.};
+
+\end{tikzpicture}
