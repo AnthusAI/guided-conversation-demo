@@ -8,8 +8,9 @@ version = "0.1.0"
 description = "Tactus demo: guided forms, support flows, static vs dynamic prompt A/B, CLI HITL"
 readme = "README.md"
 requires-python = ">=3.10"
-# Install Tactus first: pip install -e ../Tactus (sibling checkout)
-dependencies = []
+dependencies = [
+  "tactus==0.46.3",
+]
 
 [tool.setuptools]
 packages = []
@@ -18,6 +19,7 @@ packages = []
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  "pytest-xdist>=3.0",
   "pyyaml",
   "python-dotenv>=1.0.0",
   "openai>=1.0",

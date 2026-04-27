@@ -75,10 +75,11 @@ The form-filling-layer reliability win from experiment one composes cleanly unde
 
 ## Setup
 
-Install [Tactus](https://github.com/AnthusAI/Tactus) (the agent runtime) from a sibling checkout (or from PyPI), then install this repo in editable mode:
+Use a fresh virtual environment, then install this repo in editable mode. This
+also installs the pinned [Tactus](https://github.com/AnthusAI/Tactus) agent
+runtime:
 
 ```bash
-pip install -e ../Tactus
 pip install -e ".[dev]"
 ```
 
@@ -88,7 +89,14 @@ Set API access (used by both the simulated user and the agent):
 export OPENAI_API_KEY=...
 ```
 
-Optionally, put `OPENAI_API_KEY` in a repo-root `.env` (gitignored). The pytest harness auto-loads it.
+Or copy the committed template to a repo-root `.env` (gitignored), fill in
+`OPENAI_API_KEY`, and keep the smoke-test defaults until the harness is working:
+
+```bash
+cp .env.example .env
+```
+
+The pytest harness auto-loads `.env`.
 
 ## Run interactively (CLI)
 
@@ -106,18 +114,30 @@ tactus run support_flow_orchestrated_loose.tac
 
 Both experiments are real-API experiments---they cost money and take real wall time. Start with the smoke tests to verify the harness is working before launching a full pilot.
 
-### Smoke tests (1--3 minutes each, ~6 conversations per harness)
+### Smoke tests (installation/API check only)
+
+Smoke tests use `RELIABILITY_RUNS=1`, so each table cell is based on one
+stochastic conversation. Use them to check that installation, API access, and
+artifact writing work; do not interpret smoke-test rates as experimental
+evidence.
 
 ```bash
 # Experiment 1 (upfront vs. guided form-filling)
-RELIABILITY_RUNS=1 RELIABILITY_CONCURRENCY=1 \
+RELIABILITY_RUNS=1 RELIABILITY_CONCURRENCY=1 SUPPORT_RELIABILITY_RUN_TAG=smoke \
   pytest tests/test_support_elicitation_reliability.py \
     -m support_elicitation_reliability -v --tb=short
 
 # Experiment 2 (upfront vs. rigid orchestrator vs. loose orchestrator)
-RELIABILITY_RUNS=1 RELIABILITY_CONCURRENCY=1 \
+RELIABILITY_RUNS=1 RELIABILITY_CONCURRENCY=1 SUPPORT_RELIABILITY_RUN_TAG=smoke \
   pytest tests/test_support_orchestrated_reliability.py \
     -m support_orchestrated_reliability -v --tb=short
+```
+
+Summarize smoke artifacts with the same run tag:
+
+```bash
+python scripts/compare_reliability.py --experiment support_elicitation --run-tag smoke --no-ci
+python scripts/compare_reliability.py --experiment support_orchestrated --run-tag smoke --no-ci
 ```
 
 ### Small pilot (~5--10 minutes per experiment, useful for iterating)
@@ -128,6 +148,18 @@ RELIABILITY_RUNS=10 RELIABILITY_CONCURRENCY=10 \
   SUPPORT_RELIABILITY_RUN_TAG=pilot10 \
   pytest tests/test_support_elicitation_reliability.py \
     -m support_elicitation_reliability -v --tb=short
+```
+
+Pytest runs the matrix cells sequentially by default. To parallelize across
+cells too, use `pytest-xdist` and keep the per-cell concurrency lower. Total
+active conversations are roughly `-n` workers times `RELIABILITY_CONCURRENCY`:
+
+```bash
+RELIABILITY_RUNS=10 RELIABILITY_CONCURRENCY=2 \
+  RELIABILITY_PAIR_USER_SIM=1 RELIABILITY_RETRY_INFRA=1 \
+  SUPPORT_RELIABILITY_RUN_TAG=pilot10_xdist \
+  pytest tests/test_support_elicitation_reliability.py \
+    -m support_elicitation_reliability -v --tb=short -n 4
 ```
 
 ### Full pilot ($N=100$, used for the paper's headline numbers)
@@ -180,13 +212,34 @@ Per-cell artifacts (gitignored) land in `tests/results_<arm>_<persona>[_<client_
 ### Summarizing into comparison tables
 
 ```bash
-# Plaintext tables for either experiment
-python scripts/compare_reliability.py --experiment support_elicitation
-python scripts/compare_reliability.py --experiment support_orchestrated
+# Plaintext tables for either experiment. Pass the same run tag used for pytest.
+python scripts/compare_reliability.py --experiment support_elicitation --run-tag pilot10
+python scripts/compare_reliability.py --experiment support_orchestrated --run-tag pilot10
 
 # Or JSON for downstream consumption
-python scripts/compare_reliability.py --experiment support_elicitation --json
+python scripts/compare_reliability.py --experiment support_elicitation --run-tag pilot10 --json
 ```
+
+### How to read the reliability output
+
+Start with the strict-success and completion tables, then check infra failures.
+The headline claim is about strict success excluding infra failures: did the
+conversation finish, and were all required fields correct?
+
+- `ideal` --- the simulated user gives clean, cooperative answers.
+- `non_ideal` --- the simulated user may add format noise, refuse once, or give
+  a plausible wrong value before correcting.
+- `impatient` --- the simulated user has a preferred topic and may hang up when
+  the agent deflects into unrelated data collection.
+- `strict success` --- the procedure reached completion and every required
+  field matched the persona ground truth.
+- `completion` --- the procedure reached `done`, even if one or more field
+  values were wrong.
+- `infra failure` --- an API/runtime failure, not a workflow outcome.
+
+If smoke output shows similar numbers across arms, increase `RELIABILITY_RUNS`
+before drawing conclusions. With `RELIABILITY_RUNS=1`, a single lucky or unlucky
+conversation can move a cell from 0% to 100%.
 
 ### Extracting paper-ready numbers
 
