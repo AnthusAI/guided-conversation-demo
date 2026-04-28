@@ -29,11 +29,27 @@ def _repo_root() -> Path:
 
 
 def _require_cmd(name: str) -> str:
-    path = shutil.which(name)
+    path = _find_cmd(name)
     if not path:
-        print(f"error: '{name}' not found on PATH (install TeX).", file=sys.stderr)
+        print(
+            f"error: '{name}' not found. Install MacTeX/BasicTeX/TeX Live, "
+            "then restart your terminal or run: eval \"$(/usr/libexec/path_helper)\"",
+            file=sys.stderr,
+        )
         sys.exit(1)
     return path
+
+
+def _find_cmd(name: str) -> str | None:
+    """Find a command on PATH, or in the standard macOS TeX shim directory."""
+    path = shutil.which(name)
+    if path:
+        return path
+    for directory in (Path("/Library/TeX/texbin"),):
+        candidate = directory / name
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def _ignored_path(paper_dir: Path, path: Path) -> bool:
@@ -69,7 +85,7 @@ def export_chart_data(repo: Path) -> None:
 
 
 def compile_latex(paper_dir: Path) -> None:
-    _require_cmd("pdflatex")
+    pdflatex = _require_cmd("pdflatex")
     main = paper_dir / "main.tex"
     if not main.is_file():
         print(f"error: missing {main}", file=sys.stderr)
@@ -77,10 +93,11 @@ def compile_latex(paper_dir: Path) -> None:
     build_dir = paper_dir / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    if shutil.which("latexmk"):
+    latexmk = _find_cmd("latexmk")
+    if latexmk:
         subprocess.run(
             [
-                "latexmk",
+                latexmk,
                 "-pdf",
                 "-interaction=nonstopmode",
                 f"-outdir={build_dir}",
@@ -94,7 +111,7 @@ def compile_latex(paper_dir: Path) -> None:
         for i in range(2):
             r = subprocess.run(
                 [
-                    "pdflatex",
+                    pdflatex,
                     "-interaction=nonstopmode",
                     f"-output-directory={build_dir}",
                     main.name,

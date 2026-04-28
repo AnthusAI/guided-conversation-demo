@@ -241,6 +241,19 @@ If smoke output shows similar numbers across arms, increase `RELIABILITY_RUNS`
 before drawing conclusions. With `RELIABILITY_RUNS=1`, a single lucky or unlucky
 conversation can move a cell from 0% to 100%.
 
+### Cost reporting
+
+Reliability artifacts include a `cost_report` block with separate token and USD
+estimates for the agent and the LLM-backed simulated user. The comparison script
+prints estimated total cost, mean cost per run, agent-only cost per run, and
+cost per strict success when artifacts contain cost data. The agent-only tables
+are the closest proxy for production cost; the combined tables are useful for
+budgeting simulator-backed experiments.
+
+Cost estimates use the shared `openai_cost_calculator` package. If the runtime
+model is not listed exactly in the calculator's pricing table, the artifact
+marks the estimate and records the pricing model used.
+
 ### Extracting paper-ready numbers
 
 For pasting into LaTeX tables in [`docs/paper/main.tex`](docs/paper/main.tex):

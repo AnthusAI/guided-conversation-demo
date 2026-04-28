@@ -368,6 +368,17 @@ Procedure {
         local max_turns = input.max_turns or 58
         local turns = 0
         local round = 0
+        state._agent_prompt_tokens = 0
+        state._agent_completion_tokens = 0
+        state._agent_total_tokens = 0
+
+        local function record_agent_usage(result)
+            if result ~= nil and result.usage ~= nil then
+                state._agent_prompt_tokens = state._agent_prompt_tokens + (result.usage.prompt_tokens or 0)
+                state._agent_completion_tokens = state._agent_completion_tokens + (result.usage.completion_tokens or 0)
+                state._agent_total_tokens = state._agent_total_tokens + (result.usage.total_tokens or 0)
+            end
+        end
 
         local function print_flow_state()
             print("[Support flow]")
@@ -388,7 +399,8 @@ Procedure {
         local function run_guide(call_label, msg, optional_user_echo)
             turns = turns + 1
             state.last_user_message = nil
-            guide({message = msg})
+            local guide_result = guide({message = msg})
+            record_agent_usage(guide_result)
             local text = ""
             if state.last_user_message and #tostring(state.last_user_message) > 0 then
                 text = tostring(state.last_user_message)
@@ -488,9 +500,13 @@ Procedure {
             plan_approval = state.form_plan_approval,
             compliance_recording_done = state.compliance_recording_done == true,
             compliance_fee_done = state.compliance_fee_done == true,
+            agent_usage = {
+                prompt_tokens = state._agent_prompt_tokens or 0,
+                completion_tokens = state._agent_completion_tokens or 0,
+                total_tokens = state._agent_total_tokens or 0,
+            },
             step_trace = state._step_trace or {},
             violations = state._violations or {},
         }
     end,
 }
-

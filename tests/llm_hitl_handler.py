@@ -290,6 +290,13 @@ class LLMHITLHandler:
         self._seed = seed
         self.client_mode = client_mode
         self._history: list[dict] = []
+        self._usage = {
+            "model": self.model,
+            "calls": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
         # Per-handler counter of how many times each field has been requested
         # in this run, so the wrong-then-correct branch can transition to clean.
         self._elicit_calls: dict[str, int] = {}
@@ -412,6 +419,10 @@ class LLMHITLHandler:
             "n_hung_up": labels.count("hung_up"),
         }
 
+    def usage_summary(self) -> dict[str, Any]:
+        """Return cumulative OpenAI usage for LLM-backed simulated-user calls."""
+        return dict(self._usage)
+
     # ------------------------------------------------------------------
     # HITL protocol
     # ------------------------------------------------------------------
@@ -499,6 +510,14 @@ class LLMHITLHandler:
         if self._seed is not None:
             create_kwargs["seed"] = self._seed
         response = client.chat.completions.create(**create_kwargs)
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            self._usage["calls"] += 1
+            self._usage["prompt_tokens"] += int(getattr(usage, "prompt_tokens", 0) or 0)
+            self._usage["completion_tokens"] += int(
+                getattr(usage, "completion_tokens", 0) or 0
+            )
+            self._usage["total_tokens"] += int(getattr(usage, "total_tokens", 0) or 0)
 
         content = response.choices[0].message.content
         reply = (content or "").strip()
