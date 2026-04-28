@@ -89,7 +89,7 @@
 \title{Dynamic In-Context Guidance for Guided Conversations\\
 Tool-Authored Elicitations as a Reliability Lever\\
 \large Two Controlled Studies on a Constrained Support-Intake Benchmark}
-\author{Ryan Porter \and Matthew Belchak}
+\author{Ryan Porter \and Matthew Belchak \and Derek Norrbom}
 \date{\today}
 
 \newcommand{\rerunPlaceholderN}{100}
@@ -914,6 +914,31 @@ User-turn statistics (Table~\ref{tab:turns}) are the cleanest single statistic f
   \label{fig:chart-exp1-turns}
 \end{figure}
 
+\subsection{Cost pilot}
+
+The full $N=\rerunPlaceholderN$ reliability run above was not originally instrumented for token cost, so we re-ran a smaller $N=10$ pilot after adding cost capture (run tag \texttt{pilot10\_cost}). Table~\ref{tab:exp1-cost-pilot} reports estimated \emph{agent-only} API cost per strict success. Agent-only cost excludes the LLM simulated user and is therefore the closer proxy for production inference cost; combined agent-plus-simulator cost remains useful for experiment budgeting, but not for deployment cost.
+
+The guided arm is cheaper in every persona-by-mode cell, often by an order of magnitude. Across the six cells in this pilot, agent-only cost per run averages about \$0.205 for the unguided baseline and \$0.021 for the guided arm, a roughly $9.7\times$ reduction. The per-strict-success view is sharper because it charges failed long-tail runs to the arm that produced them: average cost per strict success is about \$0.560 for unguided versus \$0.028 for guided, roughly $20.0\times$ lower. The mechanism matches the turn-count results above. Unguided failures and near-failures burn long recovery tails with growing context, while guided conversations stay close to the workflow's physical turn minimum.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Experiment one cost pilot (run tag \texttt{pilot10\_cost}, $N=10$ per cell): estimated agent-only API cost per strict success. Lower is better; ratios show unguided divided by guided. Costs use \texttt{gpt-5.4-mini} pricing from \texttt{openai\_cost\_calculator}; simulated-user cost is excluded.}
+  \label{tab:exp1-cost-pilot}
+  \begin{tabular}{llrrr}
+    \toprule
+    Mode & Persona & Unguided & Guided & Ratio \\
+    \midrule
+    \emph{ideal}      & \texttt{support\_rambler}   & \$0.1787 & \$0.0156 & $11.5\times$ \\
+    \emph{ideal}      & \texttt{support\_billing}   & \$0.8870 & \$0.0209 & $42.4\times$ \\
+    \emph{ideal}      & \texttt{support\_technical} & \$0.1500 & \$0.0192 &  $7.8\times$ \\
+    \emph{non\_ideal} & \texttt{support\_rambler}   & \$0.1503 & \$0.0326 &  $4.6\times$ \\
+    \emph{non\_ideal} & \texttt{support\_billing}   & \$0.8585 & \$0.0396 & $21.7\times$ \\
+    \emph{non\_ideal} & \texttt{support\_technical} & \$1.1336 & \$0.0404 & $28.1\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \subsection{What kind of failure does in-the-moment guidance remove?}
 
 The mechanism behind H1 is concrete enough to state independently of the percentage-point magnitudes. The unguided baseline asks one stochastic LLM call to be both a conversational policy and the workflow's checklist. When the model picks the wrong branch field, or skips a required disclosure, or commits to the wrong \texttt{issue\_category}, every later turn inherits the mistake. The model can then either back out and try again (which it does, repeatedly, when the per-turn budget allows) or finish with a wrong commitment. The first failure mode shows up as \texttt{incomplete} (and explains the failed-rollout turn distribution); the second shows up as \texttt{completed\_strict\_fail} (and concentrates on \texttt{issue\_category}).
@@ -1151,6 +1176,9 @@ Failed unguided runs in experiment one approach the per-run turn cap, which mean
 \paragraph{Efficiency interpretation.}
 Each guided rollout in experiment one is necessarily at least one user-facing turn per required field, plus the disclosure turns and the final approval. The guided arm's turn counts therefore approximate the ``physical'' minimum for the workflow rather than reflecting any compression. The unguided arm's failed runs, by contrast, approach the per-run turn cap, which is a sign of exploratory loops rather than productive work. Treat the turn-count gap as evidence about \emph{shape} (the guided arm avoids long recovery tails) rather than as a UX latency claim. Experiment two's orchestrator arms are bounded similarly from below; the more interesting per-arm efficiency statistic there is hang-up rate rather than turn count.
 
+\paragraph{Cost-pilot scope.}
+The cost analysis in Experiment~1 is a post-instrumentation $N=10$ pilot rather than the $N=\rerunPlaceholderN$ headline reliability run. We use it to estimate the direction and mechanism of the cost effect, not to claim a fully powered cost benchmark. The agent-only numbers are the closest proxy for production API cost because they exclude the simulated user; combined agent-plus-simulator totals are experiment-running costs and should not be read as deployment costs. Absolute dollar values also depend on the model-pricing snapshot used by \texttt{openai\_cost\_calculator}, though the qualitative comparison is driven mainly by the observed turn-count gap.
+
 \paragraph{Deterministic floor.}
 Because both arms keep the LLM in the agent path on every turn, the experiments cannot distinguish gains attributable to the architecture from gains attributable to the workflow's intrinsic structure --- whether, for example, a non-LLM scripted form-filler is already sufficient on the \emph{ideal} simulator. Appendix~\ref{app:scripted} specifies a deterministic baseline arm (Arm C) that removes the LLM entirely from the agent path while keeping the simulator, personas, validators, and turn cap identical; reference code is shipped alongside this repository. Running it and reporting its \emph{ideal} and \emph{non\_ideal} cells alongside the paper's headline table is the cleanest available construct-validity check on the size of the architectural contribution.
 
@@ -1186,7 +1214,7 @@ A separable axis from the architectural one is whether the LLM is fine-tuned on 
 
 We argued for an alternative to the two architectures that currently dominate guided-conversation work: instead of writing the workflow into one long upfront system prompt, or maintaining several upfront system prompts and routing per-turn control to one of them, keep the LLM in a single conversational role and engineer its context dynamically by authoring short, schema-typed guidance messages from the tool layer at the moment they are needed. The Model Context Protocol's elicitation pattern gives a typed shape for what those just-in-time messages look like; the back-end behind the tool can be anything from a compiled-in checklist to a state machine to an orchestrator that delegates to nested sub-tools.
 
-The two experiments isolate two layers of the architecture. Experiment one isolates the form-filling layer: replacing a long upfront checklist with per-step tool-authored elicitations from a single \texttt{collect\_field} tool lifts equal-weighted strict success from 53.3\% to 99.0\% under \emph{ideal} client mode and from 56.7\% to 71.7\% under \emph{non\_ideal}, and lifts completion from 47--80\% to a uniform 100\% under both modes ($N=\rerunPlaceholderN$ per persona per arm; Section~\ref{sec:exp1}). The mechanism behind the gain is concrete: the LLM is no longer asked to be both the conversational policy and the workflow's checklist, and the long recovery tails that dominate the unguided baseline disappear. Experiment two isolates the orchestration layer: holding the form-filling layer constant, both a rigid orchestrator that strictly enforces phase order and a loose orchestrator that defers to user preference subject to compliance prerequisites lift equal-weighted strict success from the upfront baseline's 40.3\% to 83.3\% (rigid) and 88.7\% (loose), with the loose orchestrator paying for its higher strict-success ceiling with a non-trivial hung-up rate on the rambling persona (Section~\ref{sec:exp2}). The form-filling-layer reliability win composes cleanly under either orchestrator; the choice between rigid and loose is itself a separable design knob whose right setting depends on the predicted distribution of user behavior.
+The two experiments isolate two layers of the architecture. Experiment one isolates the form-filling layer: replacing a long upfront checklist with per-step tool-authored elicitations from a single \texttt{collect\_field} tool lifts equal-weighted strict success from 53.3\% to 99.0\% under \emph{ideal} client mode and from 56.7\% to 71.7\% under \emph{non\_ideal}, and lifts completion from 47--80\% to a uniform 100\% under both modes ($N=\rerunPlaceholderN$ per persona per arm; Section~\ref{sec:exp1}). The mechanism behind the gain is concrete: the LLM is no longer asked to be both the conversational policy and the workflow's checklist, and the long recovery tails that dominate the unguided baseline disappear. A smaller post-instrumentation cost pilot suggests the same mechanism also reduces inference cost: agent-only cost per strict success averaged about \$0.560 for unguided versus \$0.028 for guided across the pilot cells. Experiment two isolates the orchestration layer: holding the form-filling layer constant, both a rigid orchestrator that strictly enforces phase order and a loose orchestrator that defers to user preference subject to compliance prerequisites lift equal-weighted strict success from the upfront baseline's 40.3\% to 83.3\% (rigid) and 88.7\% (loose), with the loose orchestrator paying for its higher strict-success ceiling with a non-trivial hung-up rate on the rambling persona (Section~\ref{sec:exp2}). The form-filling-layer reliability win composes cleanly under either orchestrator; the choice between rigid and loose is itself a separable design knob whose right setting depends on the predicted distribution of user behavior.
 
 What the two experiments share is the framing. Where procedural detail lives, and at what granularity it reaches the LLM, is a control-architecture choice with measurable reliability consequences. Putting that procedural detail into program logic that authors short, just-in-time elicitations---rather than into one large upfront prompt or several short prompts plus a router---is a competitive architecture for guided conversations, and the design space behind it is large enough to warrant deliberate study. The architectural commitment is to where the procedure lives (single conversational role, tool-authored just-in-time guidance); the back-end mechanism behind the tool---rigid state machine, loose script, LLM-condensed planner, nested orchestrator---is a separable choice with its own reliability and flexibility trade-offs.
 

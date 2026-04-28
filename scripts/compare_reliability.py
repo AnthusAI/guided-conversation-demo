@@ -55,6 +55,14 @@ def _fmt_ci(ci: tuple[float, float] | None) -> str:
     return f"[{lo:.1%}, {hi:.1%}]"
 
 
+def _fmt_usd(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    if value < 0.01:
+        return f"${value:.6f}"
+    return f"${value:.4f}"
+
+
 EXPERIMENTS = {
     "support_elicitation": {
         "name": "support_elicitation",
@@ -145,6 +153,7 @@ def _load_json(path: Path) -> dict:
 
 def _metrics(artifact: dict) -> dict:
     runs = int(artifact.get("runs", 0))
+    successes = int(artifact.get("successes", 0) or 0)
     strict_all = float(artifact.get("strict_success_rate", artifact.get("success_rate", 0.0)))
     strict_ex = artifact.get("strict_success_rate_ex_infra")
     completion = float(artifact.get("completion_rate", 0.0))
@@ -152,8 +161,15 @@ def _metrics(artifact: dict) -> dict:
     infra_count = int(artifact.get("infra_failures", round(infra * runs)))
     hung_up_rate = artifact.get("hung_up_rate")
     eng_aware = artifact.get("engagement_aware_completion_rate")
+    cost_report = artifact.get("cost_report") or {}
+    cost_components = cost_report.get("components") or {}
+    agent_cost = cost_components.get("agent") or {}
+    user_cost = cost_components.get("user_simulator") or {}
+    cost_total_usd = cost_report.get("total_cost_usd")
+    cost_agent_total_usd = agent_cost.get("total_cost_usd")
     return {
         "runs": runs,
+        "successes": successes,
         "strict_all": strict_all,
         "strict_ex_infra": (float(strict_ex) if strict_ex is not None else None),
         "completion_rate": completion,
@@ -170,7 +186,45 @@ def _metrics(artifact: dict) -> dict:
         "verifier_checked_runs": artifact.get("verifier_checked_runs"),
         "verifier_order_ok_rate": artifact.get("verifier_order_ok_rate"),
         "verifier_branch_ok_rate": artifact.get("verifier_branch_ok_rate"),
+        "cost_total_usd": cost_total_usd,
+        "cost_mean_per_run_usd": cost_report.get("mean_cost_per_run_usd"),
+        "cost_agent_total_usd": cost_agent_total_usd,
+        "cost_agent_mean_per_run_usd": (
+            (cost_agent_total_usd / runs)
+            if isinstance(cost_agent_total_usd, (int, float)) and runs
+            else None
+        ),
+        "cost_user_simulator_total_usd": user_cost.get("total_cost_usd"),
+        "cost_per_strict_success_usd": (
+            (cost_total_usd / successes)
+            if isinstance(cost_total_usd, (int, float)) and successes
+            else None
+        ),
+        "cost_agent_per_strict_success_usd": (
+            (cost_agent_total_usd / successes)
+            if isinstance(cost_agent_total_usd, (int, float)) and successes
+            else None
+        ),
+        "cost_prompt_tokens": cost_report.get("prompt_tokens"),
+        "cost_completion_tokens": cost_report.get("completion_tokens"),
+        "cost_total_tokens": cost_report.get("total_tokens"),
+        "cost_estimated": _cost_report_estimated(cost_report),
+        "cost_pricing_errors": _cost_report_pricing_errors(cost_report),
     }
+
+
+def _cost_report_estimated(cost_report: dict) -> bool:
+    components = (cost_report or {}).get("components") or {}
+    return any(bool(component.get("estimated")) for component in components.values())
+
+
+def _cost_report_pricing_errors(cost_report: dict) -> list[str]:
+    errors: list[str] = []
+    components = (cost_report or {}).get("components") or {}
+    for component_name, component in components.items():
+        if component.get("pricing_error"):
+            errors.append(f"{component_name}: {component['pricing_error']}")
+    return errors
 
 
 def _print_table(
@@ -226,6 +280,43 @@ def _print_table(
                     line += f" {'n/a':>18}"
             print(line)
         print()
+
+
+def _print_cost_table(
+    *,
+    title: str,
+    rows: list[dict],
+    key: str,
+    variants: tuple[str, ...],
+    client_mode: str,
+    short_prefix: str,
+) -> None:
+    print(f"{title} — client_mode={client_mode}\n")
+
+    col_width = 14
+    header = f"{'Persona':<22}"
+    for v in variants:
+        header += f" {v.replace(short_prefix, ''):>{col_width}}"
+    print(header)
+    print("-" * (22 + 1 + (col_width + 1) * len(variants)))
+
+    any_estimated = False
+    pricing_errors: set[str] = set()
+    for r in rows:
+        line = f"{r['persona']:<22}"
+        for v in variants:
+            m = r["variants"][v][client_mode]
+            line += f" {_fmt_usd(m.get(key)):>{col_width}}"
+            any_estimated = any_estimated or bool(m.get("cost_estimated"))
+            pricing_errors.update(m.get("cost_pricing_errors") or [])
+        print(line)
+    if any_estimated:
+        print("\nNote: one or more cost cells use a pricing-model alias.")
+    if pricing_errors:
+        print("\nPricing errors:")
+        for err in sorted(pricing_errors):
+            print(f"- {err}")
+    print()
 
 
 def _print_robustness_summary(
@@ -424,6 +515,46 @@ def main() -> int:
                 client_mode=client_mode,
                 short_prefix=short_prefix,
             )
+        _print_cost_table(
+            title="Estimated total API cost (agent + simulated user)",
+            rows=rows,
+            key="cost_total_usd",
+            variants=experiment["variants"],
+            client_mode=client_mode,
+            short_prefix=short_prefix,
+        )
+        _print_cost_table(
+            title="Estimated mean API cost per run",
+            rows=rows,
+            key="cost_mean_per_run_usd",
+            variants=experiment["variants"],
+            client_mode=client_mode,
+            short_prefix=short_prefix,
+        )
+        _print_cost_table(
+            title="Estimated agent-only API cost per run",
+            rows=rows,
+            key="cost_agent_mean_per_run_usd",
+            variants=experiment["variants"],
+            client_mode=client_mode,
+            short_prefix=short_prefix,
+        )
+        _print_cost_table(
+            title="Estimated total API cost per strict success",
+            rows=rows,
+            key="cost_per_strict_success_usd",
+            variants=experiment["variants"],
+            client_mode=client_mode,
+            short_prefix=short_prefix,
+        )
+        _print_cost_table(
+            title="Estimated agent-only API cost per strict success",
+            rows=rows,
+            key="cost_agent_per_strict_success_usd",
+            variants=experiment["variants"],
+            client_mode=client_mode,
+            short_prefix=short_prefix,
+        )
 
     # Robustness tables only make sense if we have ≥ 2 client modes
     # (i.e. the elicitation experiment with ideal vs non_ideal).

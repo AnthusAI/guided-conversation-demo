@@ -28,6 +28,11 @@ from tactus.adapters.memory import MemoryStorage
 from tactus.core.runtime import TactusRuntime
 
 from tests.llm_hitl_handler import LLMHITLHandler
+from tests.support_costs import (
+    LiteLLMUsageTracker,
+    aggregate_cost_reports,
+    build_run_cost_report,
+)
 from tests.support_flow_verifier import verify_support_flow
 from tests.support_personas import SUPPORT_PERSONAS
 
@@ -112,11 +117,25 @@ async def _execute_once(
         source_file_path=str(tac_file.resolve()),
     )
 
-    result = await runtime.execute(
-        tac_file.read_text(encoding="utf-8"),
-        context={"max_turns": MAX_TURNS},
-        format="lua",
-    )
+    with LiteLLMUsageTracker(model="gpt-5.4-mini") as agent_usage:
+        result = await runtime.execute(
+            tac_file.read_text(encoding="utf-8"),
+            context={"max_turns": MAX_TURNS},
+            format="lua",
+        )
+    if isinstance(result, dict):
+        inner = result.get("result")
+        if isinstance(inner, dict):
+            tracked_agent_usage = agent_usage.usage_summary()
+            if tracked_agent_usage.get("total_tokens"):
+                inner["agent_usage"] = tracked_agent_usage
+            inner["user_sim_usage"] = hitl.usage_summary()
+            inner["cost_report"] = build_run_cost_report(
+                agent_model="gpt-5.4-mini",
+                agent_usage=inner.get("agent_usage"),
+                user_model=USER_MODEL,
+                user_usage=inner.get("user_sim_usage"),
+            )
     await asyncio.sleep(0.25)
     return result
 
@@ -326,6 +345,9 @@ async def test_support_elicitation_reliability(
                 "status": out.get("status"),
                 "verifier": (v.as_dict() if v else None),
                 "strict_fail_reasons": ([] if ok else strict_fail_reasons),
+                "cost_report": (
+                    res.get("cost_report") if isinstance(res, dict) else None
+                ),
                 "result_focus": (_result_focus(res, persona_name) if isinstance(res, dict) else None),
             }
         )
@@ -368,6 +390,13 @@ async def test_support_elicitation_reliability(
         "verifier_branch_ok_count": verifier_branch_ok,
         "verifier_order_ok_rate": (verifier_order_ok / verifier_checked) if verifier_checked else None,
         "verifier_branch_ok_rate": (verifier_branch_ok / verifier_checked) if verifier_checked else None,
+        "cost_report": aggregate_cost_reports(
+            [
+                item["cost_report"]
+                for item in results
+                if isinstance(item.get("cost_report"), dict)
+            ]
+        ),
         "detail": results,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -377,4 +406,3 @@ async def test_support_elicitation_reliability(
 def test_support_elicitation_tac_files_exist():
     assert UNGUIDED_TAC.is_file(), UNGUIDED_TAC
     assert GUIDED_TAC.is_file(), GUIDED_TAC
-
